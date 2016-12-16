@@ -25,6 +25,8 @@
   },
   "homepage": "https://github.com/JimmyBoh/pully-server#readme",
   "devDependencies": {
+    "@types/debug": "0.0.29",
+    "@types/levelup": "0.0.29",
     "@types/node": "0.0.2",
     "ava": "^0.17.0",
     "coveralls": "^2.11.15",
@@ -36,9 +38,12 @@
     "yargs": "^6.5.0"
   },
   "dependencies": {
+    "debug": "^2.3.3",
+    "level": "^1.5.0",
+    "level-sublevel": "^6.6.1",
     "pully": "^2.1.3",
-    "scany": "^0.2.1",
-    "skedgy": "^0.1.2"
+    "scany": "^0.4.0",
+    "skedgy": "^0.3.0"
   },
   "ava": {
     "files": [
