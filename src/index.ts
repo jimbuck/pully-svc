@@ -1,16 +1,14 @@
 import { writeFileSync } from 'fs';
+import { FlexelDatabase, FlexelQueue, AbstractDatabase } from 'flexel';
 import { Skedgy, Options as SkedgyOptions } from 'skedgy';
-import { Scany, FlatVideoData } from 'scany';
+import { Scany, VideoResult } from 'scany';
 import { Pully } from 'pully';
-const level = require('level');
-const SubLevel = require('level-sublevel');
 
 import { VideoRecord, VideoStatus } from './lib/models';
 import { VideoRepository } from './lib/video-repo';
 import { DownloadQueue } from './lib/download-queue';
 
 import { logger } from './utils/logger';
-import { LevelWrapper } from './utils/level-wrapper';
 
 const log = logger('core');
 
@@ -28,19 +26,17 @@ export class PullyServer {
   constructor(options: {
     urls: Array<string>,
     skedgyOptions?: SkedgyOptions<VideoRecord>,
-    db: LevelUp
+    db: AbstractDatabase // TODO: Replace with LevelUp type.
   }) {
     this._urls = options.urls || [];
 
-    let rootDb = SubLevel(options.db);
+    let rootDb = new FlexelDatabase(options.db);
 
     this._videoRepo = new VideoRepository({
-      db: new LevelWrapper(rootDb.sublevel('pully-server.video-repo'))
+      db: rootDb.sub('video-repo')
     });
 
-    this._downloadQueue = new DownloadQueue({
-      db: new LevelWrapper(rootDb.sublevel('pully-server.download-queue'))
-    });
+    this._downloadQueue = new DownloadQueue(rootDb.sub('download-queue'));
 
     this._scany = new Scany();
     this._pully = new Pully({
@@ -59,11 +55,11 @@ export class PullyServer {
         taskMaxDelay: options.skedgyOptions.taskMaxDelay
       }) as SkedgyOptions<VideoRecord>;
     
-    this._scheduler = new Skedgy<VideoRecord>(Object.assign<SkedgyOptions<VideoRecord>, SkedgyOptions<VideoRecord>>({
-      db: this._downloadQueue,
+    this._scheduler = new Skedgy<VideoRecord>(Object.assign({
+      db: rootDb.queue<VideoRecord>(''),
       poll: (enqueue) => this._scan(enqueue),
       work: (record) => this._download(record)
-    }, timingOptions));
+    } as SkedgyOptions<VideoRecord>, timingOptions));
   }
 
   
@@ -77,19 +73,21 @@ export class PullyServer {
   }
 
   private async _scan(enqueue: (data: VideoRecord) => void): Promise<void> {
-    const videos = await Promise.all(this._urls.map(url => this._scany.fetchFlat(url))).then(lists => {
-      return lists.reduce((result, list) => result.concat(list));
-    });
+    let videos: VideoResult[] = [];
+    for (let url in this._urls) {
+      let result = await this._scany.feed(url);
+      videos.push(...result.videos);
+    }
     
     for (let videoIndex = 0; videoIndex < videos.length; videoIndex++) {
       const video = await this._videoRepo.getOrAddVideo(videos[videoIndex]);
 
       if (video.status === VideoStatus.Queued) {
-        log(`[queued] "${video.data.title}" was already queued.`);
+        log(`[queued] "${video.data.videoTitle}" was already queued.`);
       } else if (video.status === VideoStatus.Downloaded) {
-        log(`[downloaded] "${video.data.title}" was already downloaded.`);
+        log(`[downloaded] "${video.data.videoTitle}" was already downloaded.`);
       } else {
-        log(`[enqueuing] Enqueueing "${video.data.title}"...`);
+        log(`[enqueuing] Enqueueing "${video.data.videoTitle}"...`);
         await this._videoRepo.markAsQueued(video);
         enqueue(video);
       }
@@ -97,11 +95,11 @@ export class PullyServer {
   }
 
   private async _download(video: VideoRecord): Promise<void> {
-    log(`Downloading ${video.data.title} by ${video.data.author} (${video.data.url})...`);
+    log(`Downloading ${video.data.videoTitle} by ${video.data.channelName} (${video.data.videoUrl})...`);
 
     return new Promise<void>((resolve) => {
       setTimeout(() => {
-        log(`Mock downloaded ${video.data.title} by ${video.data.author} (${video.id})`);
+        log(`Mock downloaded ${video.data.videoTitle} by ${video.data.channelName} (${video.id})`);
         this._videoRepo.markAsDownloaded(video).then(() => {
           resolve();
         });

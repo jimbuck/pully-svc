@@ -1,8 +1,8 @@
-import { FlatVideoData } from 'scany';
+import { VideoResult } from 'scany';
 
 export interface VideoRecord {
   id: string;
-  data: FlatVideoData;
+  data: VideoResult;
   status: VideoStatus;
 }
 

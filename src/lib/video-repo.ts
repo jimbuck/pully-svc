@@ -1,25 +1,25 @@
-import { VideoData } from 'scany';
+import { VideoResult } from 'scany';
 
 import { VideoRecord, VideoStatus } from './models';
 import { logger } from '../utils/logger';
-import { LevelWrapper } from '../utils/level-wrapper';
+import { FlexelDatabase } from 'flexel';
 
 const log = logger('video-repo');
 
 export class VideoRepository {
 
-  private _db: LevelWrapper;
+  private _db: FlexelDatabase;
 
-  constructor(options: { db: LevelWrapper }) {
+  constructor(options: { db: FlexelDatabase }) {
     this._db = options.db;
   }
 
-  public async getOrAddVideo(video: VideoData): Promise<VideoRecord> {
-    let item = await this._db.get<VideoRecord>(video.id);
+  public async getOrAddVideo(video: VideoResult): Promise<VideoRecord> {
+    let item = await this._db.get<VideoRecord>(video.videoId);
     
     if (!item) {
       item = {
-        id: video.id,
+        id: video.videoId,
         data: video,
         status: VideoStatus.New
       };
@@ -28,7 +28,7 @@ export class VideoRepository {
       item.data = video;
     }
     
-    await this._db.put(item.id, item);
+    await this._db.set(item.id, item);
 
     return item;
   }
@@ -36,7 +36,7 @@ export class VideoRepository {
   public async markAsQueued(record: VideoRecord): Promise<VideoRecord> {
     record = await this._db.get<VideoRecord>(record.id);
     record.status = VideoStatus.Queued;
-    await this._db.put(record.id, record);
+    await this._db.set(record.id, record);
 
     return record;
   }
@@ -44,7 +44,7 @@ export class VideoRepository {
   public async markAsDownloaded(record: VideoRecord): Promise<VideoRecord> {
     record = await this._db.get<VideoRecord>(record.id);
     record.status = VideoStatus.Downloaded;
-    await this._db.put(record.id, record);
+    await this._db.set(record.id, record);
 
     return record;
   }

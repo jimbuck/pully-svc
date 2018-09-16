@@ -1,1 +1,4 @@
 dist/**/*.spec.js
+coverage
+.nyc_output
+test

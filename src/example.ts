@@ -1,6 +1,5 @@
 import { join } from 'path';
-
-const level = require('level');
+import { FlexelDatabase } from 'flexel';
 
 import { PullyServer } from './';
 
@@ -9,9 +8,7 @@ const ps = new PullyServer({
     'https://www.youtube.com/user/freddiew',
     'https://www.youtube.com/playlist?list=PLjHf9jaFs8XUXBnlkBAuRkOpUJosxJ0Vx'
   ],
-  db: level(join(__dirname, '..', 'db'), {
-    valueEncoding: 'json'
-  }) as LevelUp,
+  db: new FlexelDatabase(join(__dirname, '..', 'db')),
   skedgyOptions: {
     pollMinDelay: 3,
     pollMaxDelay: 3,
