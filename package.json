@@ -32,7 +32,7 @@
   "homepage": "https://github.com/JimmyBoh/pully-server#readme",
   "devDependencies": {
     "@types/debug": "0.0.30",
-    "@types/node": "10.9.4",
+    "@types/node": "10.11.0",
     "ava": "^0.25.0",
     "coveralls": "^3.0.2",
     "nyc": "^13.0.1",
@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "debug": "^4.0.1",
-    "flexel": "^0.3.0",
+    "flexel": "^0.4.2",
     "pully": "^2.2.1",
     "scany": "^0.9.1",
     "skedgy": "^0.6.1"

@@ -1,14 +1,15 @@
-import { join } from 'path';
-import { FlexelDatabase } from 'flexel';
+import { join as joinPath } from 'path';
 
 import { PullyServer } from './';
 
 const ps = new PullyServer({
-  urls: [
-    'https://www.youtube.com/user/freddiew',
-    'https://www.youtube.com/playlist?list=PLjHf9jaFs8XUXBnlkBAuRkOpUJosxJ0Vx'
-  ],
-  db: new FlexelDatabase(join(__dirname, '..', 'db')),
+  watchList: {
+    urls: [
+      'https://www.youtube.com/user/freddiew',
+      'https://www.youtube.com/playlist?list=PLjHf9jaFs8XUXBnlkBAuRkOpUJosxJ0Vx'
+    ]
+  },
+  db: joinPath(__dirname, '..', 'db'),
   skedgyOptions: {
     pollMinDelay: 3,
     pollMaxDelay: 3,

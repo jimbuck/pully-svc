@@ -1,0 +1,8 @@
+{
+  "checkInterval": 4,
+  "rootDir": "./downloads",
+  "watchlist": [
+    "",
+    ""
+  ]
+}

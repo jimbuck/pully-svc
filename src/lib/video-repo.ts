@@ -1,6 +1,6 @@
 import { VideoResult } from 'scany';
 
-import { VideoRecord, VideoStatus } from './models';
+import { VideoRecord, DownloadStatus } from './models';
 import { logger } from '../utils/logger';
 import { FlexelDatabase } from 'flexel';
 
@@ -15,36 +15,34 @@ export class VideoRepository {
   }
 
   public async getOrAddVideo(video: VideoResult): Promise<VideoRecord> {
-    let item = await this._db.get<VideoRecord>(video.videoId);
+    let record = await this._db.get<VideoRecord>(video.videoId);
     
-    if (!item) {
-      item = {
-        id: video.videoId,
-        data: video,
-        status: VideoStatus.New
-      };
+    if (!record) {
+      record = Object.assign({}, video, { status: DownloadStatus.New });
     } else {
-      // Update the video data (views, ratings, description, etc. may have changed)
-      item.data = video;
+      // Update the video data (views, description, etc. may have changed)
+      Object.assign(record, video);
     }
     
-    await this._db.set(item.id, item);
+    await this._db.put(record.videoId, record);
 
-    return item;
+    return record;
   }
 
   public async markAsQueued(record: VideoRecord): Promise<VideoRecord> {
-    record = await this._db.get<VideoRecord>(record.id);
-    record.status = VideoStatus.Queued;
-    await this._db.set(record.id, record);
+    record = await this._db.get<VideoRecord>(record.videoId);
+    record.queued = new Date();
+    record.status = DownloadStatus.Queued;
+    await this._db.put(record.videoId, record);
 
     return record;
   }
 
   public async markAsDownloaded(record: VideoRecord): Promise<VideoRecord> {
-    record = await this._db.get<VideoRecord>(record.id);
-    record.status = VideoStatus.Downloaded;
-    await this._db.set(record.id, record);
+    record = await this._db.get<VideoRecord>(record.videoId);
+    record.downloaded = new Date();
+    record.status = DownloadStatus.Downloaded;
+    await this._db.put(record.videoId, record);
 
     return record;
   }

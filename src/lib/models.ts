@@ -1,12 +1,14 @@
 import { VideoResult } from 'scany';
 
-export interface VideoRecord {
-  id: string;
-  data: VideoResult;
-  status: VideoStatus;
+export interface VideoRecord extends VideoResult {
+  status: DownloadStatus;
+  queued?: Date;
+  downloaded?: Date;
+  path?: string;
 }
 
-export enum VideoStatus {
+export enum DownloadStatus {
+  Unknown,
   New,
   Queued,
   Downloaded
