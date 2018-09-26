@@ -42,7 +42,7 @@
   "dependencies": {
     "debug": "^4.0.1",
     "flexel": "^0.4.2",
-    "pully": "^2.2.1",
+    "pully": "^2.3.3",
     "scany": "^0.9.1",
     "skedgy": "^0.6.1"
   },

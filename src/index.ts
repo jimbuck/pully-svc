@@ -1,35 +1,46 @@
+import { join as joinPath } from 'path';
 import { LevelUp } from 'levelup';
-import { FlexelDatabase, FlexelQueue } from 'flexel';
+import { FlexelDatabase } from 'flexel';
 import { Skedgy, Options as SkedgyOptions } from 'skedgy';
-import { Scany, VideoResult } from 'scany';
-import { Pully, DownloadOptions } from 'pully';
+import { Scany, VideoResult, FeedResult } from 'scany';
+import { Pully, DownloadOptions, Presets } from 'pully';
 
-import { VideoRecord, DownloadStatus } from './lib/models';
+import { VideoRecord, DownloadStatus, WatchList, WatchListItem, DownloadRequest } from './lib/models';
 import { VideoRepository } from './lib/video-repo';
 import { DownloadQueue } from './lib/download-queue';
 
 import { logger } from './utils/logger';
 
+export { Presets };
+
+const SKEDGY_1_MINUTE = 60;
+const SKEDGY_5_MINUTES = SKEDGY_1_MINUTE * 5;
+const SKEDGY_1_HOUR = 60 * 60;
+const SKEDGY_4_HOURS = SKEDGY_1_HOUR * 4;
+
 const log = logger('core');
 
-export class PullyServer {
+export class PullyService {
 
   private _scheduler: Skedgy<VideoRecord>;
   private _scany: Scany;
   private _pully: Pully;
 
-  private _urls: Array<string>;
+  private _watchlist: WatchList;
 
   private _videoRepo: VideoRepository;
   private _downloadQueue: DownloadQueue;
 
   constructor(options: {
-    watchList: any,
+    watchlist: WatchList,
     db?: string | LevelUp,
     pullyOptions?: DownloadOptions,
     skedgyOptions?: SkedgyOptions<VideoRecord>
   }) {
-    this._urls = options.watchList || {};
+    if (!options.watchlist) {
+      throw new Error(`A watchlist must be provided!`);
+    }
+    this._watchlist = options.watchlist;
 
     let rootDb = options.db ? (typeof options.db === 'string'
         ? new FlexelDatabase(options.db)
@@ -44,14 +55,14 @@ export class PullyServer {
 
     this._scany = new Scany();
     this._pully = new Pully(Object.assign({
-      // TODO: Set up default options...
+      preset: Presets.HD,
     }, options.pullyOptions));
 
     const timingOptions = Object.assign({
-      pollMinDelay: 60 * 5, // 5 minutes
-      pollMaxDelay: 60 * 30, // 30 minutes
-      taskMinDelay: 60 * 5, // 5 minutes
-      taskMaxDelay: 60 * 90, // 90 minutes
+      pollMinDelay: SKEDGY_1_HOUR,
+      pollMaxDelay: SKEDGY_4_HOURS,
+      taskMinDelay: SKEDGY_1_MINUTE,
+      taskMaxDelay: SKEDGY_5_MINUTES,
     }, {
         pollMinDelay: options.skedgyOptions.pollMinDelay,
         pollMaxDelay: options.skedgyOptions.pollMaxDelay,
@@ -59,14 +70,12 @@ export class PullyServer {
         taskMaxDelay: options.skedgyOptions.taskMaxDelay
       }) as SkedgyOptions<VideoRecord>;
     
-    this._scheduler = new Skedgy<VideoRecord>(Object.assign({
-      db: rootDb.queue<VideoRecord>(''),
-      poll: (enqueue) => this._scan(enqueue),
-      work: (record) => this._download(record)
-    } as SkedgyOptions<VideoRecord>, timingOptions));
+    this._scheduler = new Skedgy<DownloadRequest>(Object.assign({
+      db: this._downloadQueue,
+      poll: this._scan.bind(this),
+      work: this._download.bind(this)
+    } as SkedgyOptions<DownloadRequest>, timingOptions));
   }
-
-  
 
   public start(): void {
     this._scheduler && this._scheduler.start();
@@ -76,46 +85,64 @@ export class PullyServer {
     this._scheduler && this._scheduler.stop();
   }
 
-  private async _scan(enqueue: (data: VideoRecord) => void): Promise<void> {
-    let videos: VideoResult[] = [];
-    for (let url in this._urls) {
-      let result = await this._scany.feed(url);
-      videos.push(...result.videos);
-    }
-    
-    for (let videoIndex = 0; videoIndex < videos.length; videoIndex++) {
-      const record = await this._videoRepo.getOrAddVideo(videos[videoIndex]);
+  public stats(): any {
+    // TODO: Return status information
+    //  - current videos in database
+    //  - current videos in queue
+    //  - current download name, progress, ETA
+  }
 
-      if (record.status === DownloadStatus.Queued) {
-        log(`[queued] "${record.videoTitle}" was already queued.`);
-      } else if (record.status === DownloadStatus.Downloaded) {
-        log(`[downloaded] "${record.videoTitle}" was already downloaded.`);
-      } else {
-        log(`[enqueuing] Enqueueing "${record.videoTitle}"...`);
-        await this._videoRepo.markAsQueued(record);
-        enqueue(record);
+  private async _scan(enqueue: (data: DownloadRequest) => void): Promise<void> {
+    
+    for (let listName in this._watchlist) {
+      let list = this._watchlist[listName];
+      let url = typeof list === 'string' ? list : list.feedUrl;
+      let feed = await this._scany.feed(url);
+      for (let video of (feed.videos as VideoRecord[])) {
+        video.watchlistName = listName;
+        video = await this._videoRepo.getOrAddVideo(video);
+
+        if (video.status === DownloadStatus.Queued) {
+          log(`[queued] "${video.videoTitle}" was already queued.`);
+        } else if (video.status === DownloadStatus.Downloaded) {
+          log(`[downloaded] "${video.videoTitle}" was already downloaded.`);
+        } else if (video.status === DownloadStatus.Downloading) {
+          log(`[downloading] "${video.videoTitle}" is currently downloading.`);
+        } else {
+          log(`[enqueuing] Enqueueing "${video.videoTitle}"...`);
+          await this._videoRepo.markAsQueued(video);
+          enqueue({ video, feed });
+        }
       }
     }
   }
 
-  private async _download(record: VideoRecord): Promise<void> {
-    log(`Downloading ${record.videoTitle} by ${record.channelName} (${record.videoUrl})...`);
+  private async _download({ video, feed }: { video: VideoRecord, feed: FeedResult }): Promise<void> {
+    log(`Downloading ${video.videoTitle} by ${video.channelName} (${video.videoUrl})...`);
+    video = await this._videoRepo.markAsDownloading(video);
+    let watchlist = getWatchlist(this._watchlist[video.watchlistName]);
 
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        log(`Mock downloaded ${record.videoTitle} by ${record.channelName} (${record.videoId})`);
-        this._videoRepo.markAsDownloaded(record).then(() => {
-          resolve();
-        });
-      }, 3000);
-    });
+    let downloadResult = await this._pully
+      .download({
+        url: video.videoUrl,
+        preset: watchlist.preset,
+        dir: watchlist.dir,
+        progress: (prog) => {
+          if (prog.indeterminate) return;
+          
+        },
+        template: () => watchlist.template(video, feed)
+      });
+    
+    video.path = downloadResult.path;
+    await this._videoRepo.markAsDownloaded(video);
 
-    // return this._pully
-    //   .download(video.data.url)
-    //   .then(results => {
-    //     this._videoRepo.markAsDownloaded(video).then(() => {
-    //       log(`Downloaded ${video.data.title} by ${video.data.author} (${video.id})`);
-    //     });
-    //   });
+    log(`Downloaded ${video.videoTitle} by ${video.channelName} (${video.videoId})`);
   }
+}
+
+function getWatchlist(item: string | WatchListItem): WatchListItem {
+  if (!item) return null;
+  if (typeof item === 'string') return { feedUrl: item };
+  return item;
 }

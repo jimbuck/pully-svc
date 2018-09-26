@@ -34,7 +34,15 @@ export class VideoRepository {
     record.queued = new Date();
     record.status = DownloadStatus.Queued;
     await this._db.put(record.videoId, record);
+    log(`Marked ${record.videoId} as queued...`);
+    return record;
+  }
 
+  public async markAsDownloading(record: VideoRecord): Promise<VideoRecord> {
+    record = await this._db.get<VideoRecord>(record.videoId);
+    record.status = DownloadStatus.Downloading;
+    await this._db.put(record.videoId, record);
+    log(`Marked ${record.videoId} as downloading...`);
     return record;
   }
 
@@ -43,7 +51,11 @@ export class VideoRepository {
     record.downloaded = new Date();
     record.status = DownloadStatus.Downloaded;
     await this._db.put(record.videoId, record);
-
+    log(`Marked ${record.videoId} as downloaded...`);
     return record;
+  }
+
+  public async resetDownloadingVideos(): Promise<void> {
+    // TODO: Need a way to query the db...
   }
 }

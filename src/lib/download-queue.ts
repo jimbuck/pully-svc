@@ -1,10 +1,10 @@
 import { FlexelQueue, AbstractDatabase } from 'flexel';
-import { VideoRecord } from './models';
+import { DownloadRequest } from './models';
 import { logger } from '../utils/logger';
 
 const log = logger('download-queue');
 
-export class DownloadQueue extends FlexelQueue<VideoRecord> {
+export class DownloadQueue extends FlexelQueue<DownloadRequest> {
   constructor(db: AbstractDatabase) {
     super(db);
   }

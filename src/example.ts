@@ -1,13 +1,16 @@
 import { join as joinPath } from 'path';
 
-import { PullyServer } from './';
+import { PullyService, Presets } from './';
+import { WatchListItem } from './lib/models';
 
-const ps = new PullyServer({
-  watchList: {
-    urls: [
-      'https://www.youtube.com/user/freddiew',
-      'https://www.youtube.com/playlist?list=PLjHf9jaFs8XUXBnlkBAuRkOpUJosxJ0Vx'
-    ]
+const ps = new PullyService({
+  watchlist: {
+    'FreddieW': 'https://www.youtube.com/user/freddiew',
+    'Smarter Every Day in 4K': {
+      feedUrl: 'https://www.youtube.com/playlist?list=PLjHf9jaFs8XUXBnlkBAuRkOpUJosxJ0Vx',
+      preset: Presets.FourK,
+      template: (video, feed) => `${feed.channelName}/${video.videoTitle}`
+    } as WatchListItem
   },
   db: joinPath(__dirname, '..', 'db'),
   skedgyOptions: {
