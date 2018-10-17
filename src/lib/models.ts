@@ -1,5 +1,4 @@
 import { VideoResult, FeedResult } from 'scany';
-import { Pully } from 'pully';
 
 export interface VideoRecord extends VideoResult {
   status: DownloadStatus;
@@ -18,12 +17,12 @@ export enum DownloadStatus {
 }
 
 export interface DownloadRequest {
-  video: VideoResult;
+  video: VideoRecord;
   feed: FeedResult;
 }
 
 export interface WatchList {
-  [listName: string]: string|WatchListItem
+  [listName: string]: string | WatchListItem
 }
 
 export interface WatchListItem {
@@ -32,5 +31,6 @@ export interface WatchListItem {
   preset?: string,
   template?: (video: VideoRecord, feed: FeedResult) => string,
   include?: string[],
-  exclude?: string[]
+  exclude?: string[],
+  downloadExisting?: boolean;
 }

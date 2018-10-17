@@ -1,8 +1,11 @@
 {
   "checkInterval": 4,
   "rootDir": "./downloads",
-  "watchlist": [
-    "",
-    ""
-  ]
+  "watchlist": {
+    "Good Mythical Morning": "<channel address>",
+    "Smarter Every Day": "<playlist address>",
+    "Corridor Digital": {
+      "custom": "stuff"
+    }
+  }
 }
