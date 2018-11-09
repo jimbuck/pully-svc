@@ -54,6 +54,14 @@ export class VideoRepository {
     return record;
   }
 
+  public async markAsIgnored(record: VideoRecord): Promise<VideoRecord> {
+    record = await this.getOrAddVideo(record);
+    record.status = DownloadStatus.Ignored;
+    await this._db.put(record);
+    log(`Marked ${record.videoId} as ignored...`);
+    return record;
+  }
+
   public async markAsFailed(record: VideoRecord): Promise<VideoRecord> {
     record = await this.getOrAddVideo(record);
     record.status = DownloadStatus.Failed;

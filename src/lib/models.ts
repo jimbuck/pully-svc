@@ -11,6 +11,7 @@ export interface VideoRecord extends VideoResult {
 export enum DownloadStatus {
   Unknown,
   New,
+  Ignored,
   Queued,
   Downloading,
   Downloaded,
@@ -20,18 +21,27 @@ export enum DownloadStatus {
 export interface DownloadRequest {
   video: VideoRecord;
   feed: FeedResult;
+  list: WatchListItem;
 }
 
-export interface WatchList {
-  [listName: string]: string | WatchListItem
+export interface PullyServiceConfig<TWatchlist=WatchListItem, TDelay=number> {
+  logging?: string | boolean;
+  db?: string;
+  pollMinDelay?: TDelay;
+  pollMaxDelay?: TDelay;
+  downloadDelay?: TDelay;
+  defaults?: DownloadDefaults;
+  watchlist: Array<TWatchlist>;
 }
 
-export interface WatchListItem {
-  feedUrl: string,
-  dir?: string,
-  preset?: string,
-  template?: (video: VideoRecord, feed: FeedResult) => string,
-  include?: string[],
-  exclude?: string[],
-  downloadExisting?: boolean;
+export interface DownloadDefaults {
+  preset?: string;
+  dir?: string;
+  format?: string;
+  match?: string[];
+}
+
+export interface WatchListItem extends DownloadDefaults {
+  feedUrl: string;
+  enabled?: boolean;
 }

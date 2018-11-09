@@ -5,7 +5,7 @@
   "main": "index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "pully-server": "./dist/bin/pully-server.js"
+    "pully-svc": "./dist/bin/pully-server.js"
   },
   "scripts": {
     "clean": "rimraf ./dist/** ./coverage",
@@ -32,7 +32,8 @@
   "homepage": "https://github.com/JimmyBoh/pully-server#readme",
   "devDependencies": {
     "@types/debug": "0.0.31",
-    "@types/node": "10.12.3",
+    "@types/node": "10.12.4",
+    "@types/yargs": "^12.0.1",
     "ava": "^0.25.0",
     "coveralls": "^3.0.2",
     "nyc": "^13.1.0",
@@ -42,9 +43,13 @@
   "dependencies": {
     "debug": "^4.1.0",
     "flexel": "^0.7.2",
-    "pully": "^2.3.3",
+    "multimatch": "^2.1.0",
+    "parse-duration": "^0.1.1",
+    "pully": "^2.4.1",
+    "pully-core": "^0.6.0",
     "scany": "^0.9.1",
-    "skedgy": "^0.7.1"
+    "skedgy": "^0.7.2",
+    "yargs": "^12.0.2"
   },
   "ava": {
     "files": [

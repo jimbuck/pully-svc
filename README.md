@@ -14,21 +14,30 @@ Youtube channel and playlist auto-downloader!
 *More Details - Coming Soon!*
 
 
-## Example:
+## Usage:
 
-```ts
-// Coming Soon as well!
+```bash
+pully-svc init # creates a default config file at cwd called ./pully.conf.json
+
+pully-svc init -c ./special.json # creates a default config file called ./special.json
+
+pully-svc # starts the service with the config ./pully.conf.json
+
+pully-svc -c ./special.json # starts the service with the config at ./special.json
+
 ```
 
 
 ## Features:
- - Sorry, you'll just have to wait!
+ - Simple JSON configuration, configure all feeds or add special configurations per feed.
+ - Simple command line (two commands, one argument).
+ - Periodically checks channels and/or playlists for new videos.
  
 ## Contribute
  
  0. Fork it
  1. `npm i`
- 2. `gulp watch`
+ 2. `npm run watch`
  3. Make changes and **write tests**.
  4. Send pull request! :sunglasses:
  

@@ -1,11 +1,24 @@
 {
-  "checkInterval": 4,
-  "rootDir": "./downloads",
-  "watchlist": {
-    "Good Mythical Morning": "<channel address>",
-    "Smarter Every Day": "<playlist address>",
-    "Corridor Digital": {
-      "custom": "stuff"
+  "logging": "pully*",
+  "db": "./temp/pully-db",
+  "pollMinDelay": "5 minutes",
+  "pollMaxDelay": "10 minutes",
+  "downloadDelay": "5 seconds",
+  "defaults": {
+    "preset": "2K",
+    "dir": "C:/downloads",
+    "format": "${feed.feedName}/${video.title}"
+  },
+  "watchlist": [
+    "<channel or playlist address>",
+    {
+      "feedUrl": "<channel or playlist address>",
+      "enabled": false,
+
+      "preset": "4K",
+      "dir": "Z:/downloads",
+      "format": "${feed.feedName} [${feed.feedId}]/${video.title} - ${video.published} [${video.videoId}]",
+      "match": ["titles to include #*", "!titles to exclude*"]
     }
-  }
+  ]
 }
