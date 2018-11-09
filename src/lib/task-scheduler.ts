@@ -5,6 +5,7 @@ import { Pully, PullyOptions } from 'pully';
 import { logger } from '../utils/logger';
 import { VideoRepository } from './video-repo';
 import FlexelDatabase from 'flexel';
+import { DownloadQueue } from './download-queue';
 
 const log = logger('task-scheduler');
 
@@ -15,6 +16,7 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
   private _scany: Scany;
   private _pully: Pully;
   private _videoRepo: VideoRepository;
+  private _downloadQueue: DownloadQueue;
 
   constructor(options: {
     rootDb: FlexelDatabase,
@@ -22,6 +24,7 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
     pully: PullyOptions,
     scheduler: Options<DownloadRequest>
   }) {
+    options.scheduler. queue = new DownloadQueue(options.rootDb.sub('downloads'));
     super(options.scheduler);
 
     this._watchlist = options.watchList;

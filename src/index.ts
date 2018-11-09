@@ -24,7 +24,6 @@ const log = logger('core');
 export class PullyService {
 
   private _scheduler: TaskScheduler;
-  private _downloadQueue: DownloadQueue;
 
   constructor(options: {
     watchlist: WatchList,
@@ -51,9 +50,7 @@ export class PullyService {
         pollMaxDelay: options.skedgyOptions.pollMaxDelay,
         workMinDelay: options.skedgyOptions.workMinDelay,
         workMaxDelay: options.skedgyOptions.workMaxDelay
-      }) as SkedgyOptions<VideoRecord>;
-    
-    this._downloadQueue = new DownloadQueue(rootDb.sub('downloads'));
+      }) as SkedgyOptions<DownloadRequest>;
     
     this._scheduler = new TaskScheduler({
       rootDb,
@@ -61,9 +58,7 @@ export class PullyService {
       pully: Object.assign({
         preset: Presets.HD,
       }, options.pullyOptions),
-      scheduler: Object.assign({
-        db: this._downloadQueue
-      } as SkedgyOptions<DownloadRequest>, timingOptions)
+      scheduler: timingOptions
     });
   }
 

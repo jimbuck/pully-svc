@@ -13,7 +13,8 @@ export enum DownloadStatus {
   New,
   Queued,
   Downloading,
-  Downloaded
+  Downloaded,
+  Failed
 }
 
 export interface DownloadRequest {

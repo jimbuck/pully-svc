@@ -19,18 +19,17 @@ export class VideoRepository {
     
     if (!record) {
       record = Object.assign({}, video, { status: DownloadStatus.New });
+      await this._db.put(record);
     } else {
       // Update the video data (views, description, etc. may have changed)
       Object.assign(record, video);
     }
-    
-    await this._db.put(record);
 
     return record;
   }
 
   public async markAsQueued(record: VideoRecord): Promise<VideoRecord> {
-    record = await this._db.get(record.videoId);
+    record = await this.getOrAddVideo(record);
     record.queued = new Date();
     record.status = DownloadStatus.Queued;
     await this._db.put(record);
@@ -39,7 +38,7 @@ export class VideoRepository {
   }
 
   public async markAsDownloading(record: VideoRecord): Promise<VideoRecord> {
-    record = await this._db.get(record.videoId);
+    record = await this.getOrAddVideo(record);
     record.status = DownloadStatus.Downloading;
     await this._db.put(record);
     log(`Marked ${record.videoId} as downloading...`);
@@ -47,11 +46,19 @@ export class VideoRepository {
   }
 
   public async markAsDownloaded(record: VideoRecord): Promise<VideoRecord> {
-    record = await this._db.get(record.videoId);
+    record = await this.getOrAddVideo(record);
     record.downloaded = new Date();
     record.status = DownloadStatus.Downloaded;
     await this._db.put(record);
     log(`Marked ${record.videoId} as downloaded...`);
+    return record;
+  }
+
+  public async markAsFailed(record: VideoRecord): Promise<VideoRecord> {
+    record = await this.getOrAddVideo(record);
+    record.status = DownloadStatus.Failed;
+    await this._db.put(record);
+    log(`Marked ${record.videoId} as failed...`);
     return record;
   }
 
