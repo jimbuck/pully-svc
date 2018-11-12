@@ -1,10 +1,10 @@
-import { join as joinPath } from 'path';
+import { join as joinPath, basename } from 'path';
 import { EventEmitter } from 'events';
 
 import { Scany } from 'scany';
 import FlexelDatabase from 'flexel';
 import { template } from 'pully-core';
-import { Pully } from 'pully';
+import { Pully, DownloadResults } from 'pully';
 import { Scheduler, Options as SkedgyOptions } from 'skedgy';
 const parseDuration: ((str: string) => number) = require('parse-duration');
 
@@ -56,27 +56,48 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
     this._pully = new Pully();
 
     this._videoRepo = new VideoRepository({
-      db: options.rootDb.table<VideoRecord>('videos', 'videoId')
+      db: options.rootDb.table<VideoRecord>('videos', 'videoId'),
+      emitter: this._emitter
     });
   }
   
-  protected async poll(): Promise<void> {
+  public async poll(): Promise<void> {
     for (let list of this._config.watchlist) {
-      await this._find(list);
+      await this._find(list).catch(err => {
+        log(`Error occurred while polling: ${JSON.stringify(err)}`);
+        this._emitter.emit('pollfailed', { list });
+      });
     }
   }
 
+  public async enqueue({ video, feed, list }: DownloadRequest) {
+    video = await this._videoRepo.markAsQueued(video);
+    await super.enqueue({ video, feed, list });
+    this._emitter.emit('queued', { video, feed, list });
+  }
+
+  public async skip({ video, feed, list }: DownloadRequest, reason: string) {
+    video = await this._videoRepo.markAsSkipped(video, reason);
+    this._emitter.emit('skipped', { video, feed, list });
+  }
+
   private async _find(list: WatchListItem) {
+    const now = new Date();
     this._emitter.emit('scanning', { list });
     let feed = await this._scany.feed(list.feedUrl);
+    log(`Found ${feed.videos.length} videos for '${list.feedUrl}'`);
     for (let video of (feed.videos as VideoRecord[])) {
-      video.watchlistName = name;
+      video.watchlistName = list.feedUrl;
       video = await this._videoRepo.getOrAddVideo(video);
       
       if (!matchPatterns(video.videoTitle, this._config.defaults.match, list.match)) {
-        log(`[ignored] "${video.videoTitle}" does not match patterns.`);
-        video = await this._videoRepo.markAsIgnored(video);
-        this._emitter.emit('ignored', { video, feed, list });
+        await this.skip({ video, feed, list }, 'excluded by pattern');
+        continue;
+      }
+
+      let videoAge = now.valueOf() - (video.published || new Date(0)).valueOf();
+      if (videoAge < this._config.maxRetroDownload) {
+        await this.skip({ video, feed, list }, 'greater than max retro');
         continue;
       }
 
@@ -87,22 +108,21 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
       } else if (video.status === DownloadStatus.Downloading) {
         log(`[downloading] "${video.videoTitle}" is currently downloading.`);
       } else {
+        // TODO: Add current queue count...
         log(`[enqueuing] Enqueueing "${video.videoTitle}"...`);
-        video = await this._videoRepo.markAsQueued(video);
         this.enqueue({ video, feed, list });
-        this._emitter.emit('queued', { video, feed, list });
       }
     }
     this._emitter.emit('scanned', { feed, list });
   }
   
   protected async work({ feed, video, list}: DownloadRequest): Promise<void> {
-    log(`Downloading ${video.videoTitle} by ${video.channelName} (${video.videoUrl})...`);
+    log(`Downloading ${video.videoTitle} by ${video.channelName} (${video.videoUrl}) to '${list.dir}'...`);
     video = await this._videoRepo.markAsDownloading(video);
     this._emitter.emit('downloading', { video, feed, list });
 
     const templateFn = template(list.format).bind(null, { feed, video });
-
+    let prevProg = 0;
     await this._pully
       .download({
         url: video.videoUrl,
@@ -110,6 +130,11 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
         dir: list.dir,
         progress: (prog) => {
           if (prog.indeterminate) return;
+          let progChange = prog.percent - prevProg;
+          //if (progChange >= 1 || prog.percent >= 100) {
+            log(`[progress] '${video.videoTitle}' - ${prog.percent}%`);
+            prevProg = prog.percent;
+          //}
           this._emitter.emit('progress', { feed, list, video, prog });
         },
         template: templateFn
@@ -130,9 +155,11 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
 function prepConfig(config: PullyServiceConfig<any, any>): PullyServiceConfig {
   config.watchlist = (config.watchlist || []).map(item => {
     if (!item) return null;
-    if (typeof item === 'string') return { feedUrl: item };
+    if (typeof item === 'string') item = { feedUrl: item };
     return Object.assign({}, config.defaults, item);
   }).filter(item => !!item);
+
+  if (config.maxRetroDownload) config.maxRetroDownload = parseDuration(config.maxRetroDownload);
 
   config.defaults = config.defaults || {};
 

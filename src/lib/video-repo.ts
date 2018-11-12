@@ -3,15 +3,21 @@ import { VideoResult } from 'scany';
 import { VideoRecord, DownloadStatus } from './models';
 import { logger } from '../utils/logger';
 import { FlexelTable } from 'flexel';
+import { EventEmitter } from 'events';
 
 const log = logger('video-repo');
 
 export class VideoRepository {
 
   private _db: FlexelTable<VideoRecord>;
+  private _emitter: EventEmitter;
 
-  constructor(options: { db: FlexelTable<VideoRecord> }) {
+  constructor(options: {
+    db: FlexelTable<VideoRecord>,
+    emitter: EventEmitter
+  }) {
     this._db = options.db;
+    this._emitter = options.emitter;
   }
 
   public async getOrAddVideo(video: VideoResult): Promise<VideoRecord> {
@@ -54,11 +60,12 @@ export class VideoRepository {
     return record;
   }
 
-  public async markAsIgnored(record: VideoRecord): Promise<VideoRecord> {
+  public async markAsSkipped(record: VideoRecord, reason: string): Promise<VideoRecord> {
     record = await this.getOrAddVideo(record);
-    record.status = DownloadStatus.Ignored;
+    record.status = DownloadStatus.Skipped;
+    record.reason = reason;
     await this._db.put(record);
-    log(`Marked ${record.videoId} as ignored...`);
+    log(`Marked ${record.videoId} as skipped: '${reason}'...`);
     return record;
   }
 

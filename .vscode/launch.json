@@ -13,10 +13,20 @@
       "outFiles": ["${workspaceRoot}/dist/**/*"],
       "sourceMaps": true,
       "console": "externalTerminal",
-      "preLaunchTask": "build",
       "env": {
         "DEBUG": "*"
       }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Test",
+      "program": "${workspaceRoot}/dist/bin/pully-server.js",
+      "cwd": "${workspaceRoot}/test",
+      "outFiles": ["${workspaceRoot}/dist/**/*"],
+      "sourceMaps": true,
+      "console": "externalTerminal",
+      "args":[]
     },
     {
       "type": "node",

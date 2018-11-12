@@ -2,6 +2,7 @@ import { VideoResult, FeedResult } from 'scany';
 
 export interface VideoRecord extends VideoResult {
   status: DownloadStatus;
+  reason?: string;
   queued?: Date;
   downloaded?: Date;
   path?: string;
@@ -11,7 +12,7 @@ export interface VideoRecord extends VideoResult {
 export enum DownloadStatus {
   Unknown,
   New,
-  Ignored,
+  Skipped,
   Queued,
   Downloading,
   Downloaded,
@@ -24,12 +25,15 @@ export interface DownloadRequest {
   list: WatchListItem;
 }
 
-export interface PullyServiceConfig<TWatchlist=WatchListItem, TDelay=number> {
+
+
+export interface PullyServiceConfig<TWatchlist=WatchListItem, TDuration=number> {
   logging?: string | boolean;
   db?: string;
-  pollMinDelay?: TDelay;
-  pollMaxDelay?: TDelay;
-  downloadDelay?: TDelay;
+  pollMinDelay?: TDuration;
+  pollMaxDelay?: TDuration;
+  downloadDelay?: TDuration;
+  maxRetroDownload?: TDuration,
   defaults?: DownloadDefaults;
   watchlist: Array<TWatchlist>;
 }

@@ -37,3 +37,4 @@ typings
 dist
 .nyc_output
 db
+test

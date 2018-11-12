@@ -4,6 +4,7 @@
   "pollMinDelay": "5 minutes",
   "pollMaxDelay": "10 minutes",
   "downloadDelay": "5 seconds",
+  "maxRetroDownload": "24 hours",
   "defaults": {
     "preset": "2K",
     "dir": "C:/downloads",

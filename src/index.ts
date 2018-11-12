@@ -1,3 +1,4 @@
+import { mkdirSync } from 'fs';
 import { FlexelDatabase } from 'flexel';
 import { Presets, DownloadResults, ProgressData } from 'pully';
 
@@ -19,6 +20,7 @@ export const DEFAULT_CONFIG: PullyServiceConfig<string|WatchListItem, string> = 
   pollMinDelay: '5 minutes',
   pollMaxDelay: '10 minutes',
   downloadDelay: '5 seconds',
+  maxRetroDownload: '24 hours',
   defaults: {
     preset: Presets.HD,
     dir: './downloads',
@@ -33,11 +35,12 @@ export declare interface PullyService {
   on(event: 'scanning', listener: (args: { list: WatchListItem }) => void): this;
   on(event: 'scanned', listener: (args: { list: WatchListItem, feed: FeedResult }) => void): this;
   on(event: 'queued', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord }) => void): this;
-  on(event: 'ignored', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord }) => void): this;
+  on(event: 'skipped', listener: (args: { video: VideoRecord }) => void): this;
   on(event: 'downloading', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord }) => void): this;
   on(event: 'progress', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord, prog: ProgressData }) => void): this;
   on(event: 'downloaded', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord, downloadResult: DownloadResults }) => void): this;
   on(event: 'downloadfailed', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord }) => void): this;
+  on(event: 'pollfailed', listener: (args: { list: WatchListItem }) => void): this;
 }
 
 export class PullyService extends EventEmitter {
