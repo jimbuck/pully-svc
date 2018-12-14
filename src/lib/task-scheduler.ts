@@ -1,10 +1,12 @@
-import { join as joinPath, basename } from 'path';
+import { join as joinPath, dirname as extractDirName, resolve as resolvePath, extname as extName } from 'path';
+import { rename as renameFile } from 'fs';
+import * as mkdirp from 'mkdirp';
 import { EventEmitter } from 'events';
 
-import { Scany } from 'scany';
+import { scanFeed } from 'scany';
 import FlexelDatabase from 'flexel';
-import { template } from 'pully-core';
-import { Pully, DownloadResults } from 'pully';
+import { template, scrubObject } from 'pully-core';
+import { Pully, DownloadConfig } from 'pully';
 import { Scheduler, Options as SkedgyOptions } from 'skedgy';
 const parseDuration: ((str: string) => number) = require('parse-duration');
 
@@ -26,7 +28,6 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
   
   private _config: PullyServiceConfig;
 
-  private _scany: Scany;
   private _pully: Pully;
   private _videoRepo: VideoRepository;
   private _emitter: EventEmitter;
@@ -52,7 +53,6 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
     this._emitter = options.emitter;
     this._config = prepConfig(options.config);
 
-    this._scany = new Scany();
     this._pully = new Pully();
 
     this._videoRepo = new VideoRepository({
@@ -84,7 +84,7 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
   private async _find(list: WatchListItem) {
     const now = new Date();
     this._emitter.emit('scanning', { list });
-    let feed = await this._scany.feed(list.feedUrl);
+    let feed = await scanFeed(list.feedUrl);
     log(`Found ${feed.videos.length} videos for '${list.feedUrl}'`);
     for (let video of (feed.videos as VideoRecord[])) {
       video.watchlistName = list.feedUrl;
@@ -117,39 +117,54 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
   }
   
   protected async work({ feed, video, list}: DownloadRequest): Promise<void> {
-    log(`Downloading ${video.videoTitle} by ${video.channelName} (${video.videoUrl}) to '${list.dir}'...`);
     video = await this._videoRepo.markAsDownloading(video);
-    this._emitter.emit('downloading', { video, feed, list });
-
-    const templateFn = template(list.format).bind(null, { feed, video });
+    
+    const templateFn: () => string = template(list.format).bind(null, { feed: scrubObject(feed), video: scrubObject(video) });
     let prevProg = 0;
     await this._pully
       .download({
         url: video.videoUrl,
         preset: list.preset,
-        dir: list.dir,
+        info: (format) => {
+          this._emitter.emit('downloading', { video, feed, list });
+          log(`Downloading ${video.videoTitle} by ${video.channelName} (${video.videoUrl}) to '${format.path}'...`);
+        },
         progress: (prog) => {
           if (prog.indeterminate) return;
           let progChange = prog.percent - prevProg;
-          //if (progChange >= 1 || prog.percent >= 100) {
+          if (progChange >= 0.25 || prog.percent >= 100) {
             log(`[progress] '${video.videoTitle}' - ${prog.percent}%`);
             prevProg = prog.percent;
-          //}
+          }
           this._emitter.emit('progress', { feed, list, video, prog });
-        },
-        template: templateFn
-      }).then(async downloadResult => {
-        video.path = downloadResult.path;
+        }
+      } as DownloadConfig).then(async downloadResult => {
+        const tempPath = downloadResult.path;
+        const targetPath = resolvePath(list.dir, templateFn() + extName(tempPath));
+        log(`Moving (${video.videoUrl}) from '${tempPath}' to '${targetPath}'...`);
+        await moveFile(tempPath, targetPath);
+        
+        video.path = downloadResult.path = targetPath;
         await this._videoRepo.markAsDownloaded(video);
     
         log(`Downloaded ${video.videoTitle} by ${video.channelName} (${video.videoId})`);
         this._emitter.emit('downloaded', { video, feed, list });
-      }, async err => {
+      }).catch(async err => {
         await this._videoRepo.markAsFailed(video);
         log(`Failed to download ${video.videoTitle} (${video.videoId}): ${err.toString()}`);
+
         this._emitter.emit('downloadfailed', { video, feed, list });
       });
   }
+}
+
+function moveFile(oldPath: string, newPath: string) {
+  return new Promise<void>((resolve, reject) => {
+    mkdirp(extractDirName(newPath), function (err) {
+      if (err) return reject(err);
+      renameFile(oldPath, newPath, err => err ? reject(err) : resolve());
+    });
+  });
 }
 
 function prepConfig(config: PullyServiceConfig<any, any>): PullyServiceConfig {
