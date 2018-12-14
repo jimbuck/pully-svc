@@ -35,13 +35,13 @@
   "devDependencies": {
     "@types/debug": "0.0.31",
     "@types/mkdirp": "^0.5.2",
-    "@types/node": "10.12.10",
+    "@types/node": "10.12.15",
     "@types/yargs": "^12.0.1",
     "ava": "^0.25.0",
     "coveralls": "^3.0.2",
     "nyc": "^13.1.0",
     "rimraf": "^2.6.2",
-    "typescript": "^3.1.6"
+    "typescript": "^3.2.2"
   },
   "dependencies": {
     "debug": "^4.1.0",
@@ -51,7 +51,7 @@
     "parse-duration": "^0.1.1",
     "pully": "^2.5.0",
     "pully-core": "^0.7.4",
-    "scany": "^1.1.0",
+    "scany": "^1.2.0",
     "skedgy": "^0.7.3",
     "yargs": "^12.0.5"
   },

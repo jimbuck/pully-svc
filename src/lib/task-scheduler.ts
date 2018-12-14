@@ -95,7 +95,7 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
         continue;
       }
 
-      let videoAge = now.valueOf() - (video.published || new Date(0)).valueOf();
+      let videoAge = now.valueOf() - (video.published || new Date()).valueOf();
       if (videoAge < this._config.maxRetroDownload) {
         await this.skip({ video, feed, list }, 'greater than max retro');
         continue;
