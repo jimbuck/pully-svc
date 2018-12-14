@@ -15,5 +15,5 @@ export function configureLogs(namespaces: string | boolean): void {
 }
 
 export function logger(area: string): debug.IDebugger {
-  return loggers[area] = (loggers[area] || debug(`pully-server:${area}`));
+  return loggers[area] = (loggers[area] || debug(`pully-svc:${area}`));
 }

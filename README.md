@@ -1,4 +1,4 @@
-# pully-server
+# pully-svc
 
 Youtube channel and playlist auto-downloader!
 
@@ -29,9 +29,10 @@ pully-svc -c ./special.json # starts the service with the config at ./special.js
 
 
 ## Features:
- - Simple JSON configuration, configure all feeds or add special configurations per feed.
+ - Simple JSON configuration, with global and per-feed customization.
  - Simple command line (two commands, one argument).
  - Periodically checks channels and/or playlists for new videos.
+ - Downloads complete metadata, contains internal database of video information.
  
 ## Contribute
  
