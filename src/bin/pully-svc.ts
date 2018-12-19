@@ -6,7 +6,7 @@ import { resolve as resolvePath } from 'path';
 import * as yargs from 'yargs';
 
 import { PullyService, DEFAULT_CONFIG } from '..';
-import { PullyServiceConfig, WatchListItem } from '../lib/models';
+import { PullySvcConfig } from '../lib/models';
 
 const DEFAULT_CONFIG_PATH = './pully.conf.json';
 
@@ -52,10 +52,11 @@ function run({ config: configPath }: { config: string, db: string } & yargs.Argu
     process.exit(1);
   }
   
-  let config: PullyServiceConfig<string | WatchListItem, string> = require(configPath);
+  let config: PullySvcConfig = require(configPath);
 
   const pullySvc = new PullyService(config);
 
+  console.log(`Starting pully-svc...`);
   pullySvc.start();
 }
 
@@ -67,7 +68,10 @@ function init({ config: configPath }: { config: string } & yargs.Arguments) {
 
   // Copy and assign the watchlist so it appears at the bottom of the JSON file...
   let data = Object.assign({}, DEFAULT_CONFIG);
-  data.watchlist = ['<channel or playlist URL>'];
+  data.watchlist = [{
+    desc: 'A name or description can go here...',
+    feedUrl: '<channel or playlist URL>'
+  }];
 
   writeFileSync(configPath, JSON.stringify(data, null, '\t'));
   console.log(`New config created at ${configPath}!`);

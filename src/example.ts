@@ -9,6 +9,7 @@ import FlexelDatabase from 'flexel';
 import { EventEmitter } from 'events';
 
 import { scrubString } from 'pully-core';
+import { notify } from './utils/logger';
 
 (async () => {
   const str = 'Uploads from YOGSCAST Lewis & Simon [UUH-_hzb2ILSCo9ftVSnrCIQ]';

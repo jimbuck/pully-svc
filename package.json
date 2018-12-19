@@ -34,6 +34,7 @@
   "homepage": "https://github.com/JimmyBoh/pully-server#readme",
   "devDependencies": {
     "@types/debug": "0.0.31",
+    "@types/got": "^9.2.1",
     "@types/mkdirp": "^0.5.2",
     "@types/node": "10.12.15",
     "@types/yargs": "^12.0.1",
@@ -46,6 +47,7 @@
   "dependencies": {
     "debug": "^4.1.0",
     "flexel": "^0.7.3",
+    "got": "^9.4.0",
     "mkdirp": "^0.5.1",
     "multimatch": "^2.1.0",
     "parse-duration": "^0.1.1",

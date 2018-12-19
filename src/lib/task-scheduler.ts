@@ -1,20 +1,20 @@
 import { join as joinPath, dirname as extractDirName, resolve as resolvePath, extname as extName } from 'path';
-import { rename as renameFile } from 'fs';
+import { copyFile as copyFile, unlink as deleteFile } from 'fs';
 import * as mkdirp from 'mkdirp';
 import { EventEmitter } from 'events';
 
-import { scanFeed } from 'scany';
+import { scanFeed, findFeed } from 'scany';
 import FlexelDatabase from 'flexel';
-import { template, scrubObject } from 'pully-core';
+import { template, scrubObject, extractPlaylistId } from 'pully-core';
 import { Pully, DownloadConfig } from 'pully';
 import { Scheduler, Options as SkedgyOptions } from 'skedgy';
-const parseDuration: ((str: string) => number) = require('parse-duration');
 
-import { logger } from '../utils/logger';
+import { logger, notify } from '../utils/logger';
 import { VideoRepository } from './video-repo';
 import { DownloadQueue } from './download-queue';
-import { VideoRecord, DownloadRequest, DownloadStatus, WatchListItem, PullyServiceConfig } from './models';
+import { VideoRecord, DownloadRequest, DownloadStatus, WatchListItem, PullySvcConfig, ParsedPullySvcConfig, ParsedWatchListItem } from './models';
 import { matchPatterns } from '../utils/matcher';
+import { stripTime } from '../utils/dates-helpers';
 
 const log = logger('task-scheduler');
 
@@ -26,15 +26,19 @@ const TIMING = {
 };
 export class TaskScheduler extends Scheduler<DownloadRequest> {
   
-  private _config: PullyServiceConfig;
+  private _config: ParsedPullySvcConfig;
 
   private _pully: Pully;
   private _videoRepo: VideoRepository;
   private _emitter: EventEmitter;
 
+  private get _downloadQueue() {
+    return this.queue as DownloadQueue;
+  }
+
   constructor(options: {
     rootDb: FlexelDatabase,
-    config: PullyServiceConfig<string | WatchListItem, string>,
+    config: ParsedPullySvcConfig,
     emitter: EventEmitter
   }) {
     const timingOptions: SkedgyOptions<DownloadRequest> = {
@@ -44,14 +48,14 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
       workMaxDelay: TIMING.FIVE_SECONDS,
       queue: new DownloadQueue(options.rootDb.sub('downloads'))
     };
-    if (options.config.pollMinDelay) timingOptions.pollMinDelay = parseDuration(options.config.pollMinDelay);
-    if (options.config.pollMaxDelay) timingOptions.pollMaxDelay = parseDuration(options.config.pollMaxDelay);
-    if (options.config.downloadDelay) timingOptions.workMinDelay = timingOptions.workMaxDelay = parseDuration(options.config.downloadDelay);
+    if (options.config.pollMinDelay) timingOptions.pollMinDelay = options.config.pollMinDelay;
+    if (options.config.pollMaxDelay) timingOptions.pollMaxDelay = options.config.pollMaxDelay;
+    if (options.config.downloadDelay) timingOptions.workMinDelay = timingOptions.workMaxDelay = options.config.downloadDelay;
     
     super(timingOptions);
 
     this._emitter = options.emitter;
-    this._config = prepConfig(options.config);
+    this._config = options.config;
 
     this._pully = new Pully();
 
@@ -77,43 +81,63 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
   }
 
   public async skip({ video, feed, list }: DownloadRequest, reason: string) {
+    if (video.status === DownloadStatus.Skipped) return;
+    
     video = await this._videoRepo.markAsSkipped(video, reason);
     this._emitter.emit('skipped', { video, feed, list });
   }
 
-  private async _find(list: WatchListItem) {
-    const now = new Date();
+  private async _find(list: ParsedWatchListItem) {
+    if (!list.enabled) return;
+
+    const today = stripTime(new Date());
     this._emitter.emit('scanning', { list });
-    let feed = await scanFeed(list.feedUrl);
-    log(`Found ${feed.videos.length} videos for '${list.feedUrl}'`);
-    for (let video of (feed.videos as VideoRecord[])) {
-      video.watchlistName = list.feedUrl;
+    let scannedFeed = await scanFeed(list.feedUrl);
+    //log(`Found ${scannedFeed.videos.length} videos for '${list.feedUrl}'`);
+    for (let video of (scannedFeed.videos as VideoRecord[])) {
+      let feed = scannedFeed;
       video = await this._videoRepo.getOrAddVideo(video);
+
+      if (video.status !== DownloadStatus.New) {
+        // if (video.status === DownloadStatus.Queued) {
+        //   log(`[queued] "${video.videoTitle}" was already queued.`);
+        // } else if (video.status === DownloadStatus.Downloaded) {
+        //   log(`[downloaded] "${video.videoTitle}" was already downloaded.`);
+        // } else if (video.status === DownloadStatus.Downloading) {
+        //   log(`[downloading] "${video.videoTitle}" is currently downloading.`);
+        // } else if (video.status === DownloadStatus.Skipped) {
+        //   log(`[skipped] "${video.videoTitle}" was already skipped.`);
+        // }
+        continue;
+      }
+
+      if (list.lookupPlaylist) {
+        if (extractPlaylistId(list.feedUrl)) {
+          // Don't lookup playlist if it is a playlist...
+        } else {
+          log(`Looking up playlist for '${video.videoTitle}'...`);
+          feed = await findFeed(video).catch(() => scannedFeed);
+          log(`Saving '${video.videoTitle}' under playlist '${feed.playlistTitle}'...`);
+        }
+      }
       
       if (!matchPatterns(video.videoTitle, this._config.defaults.match, list.match)) {
         await this.skip({ video, feed, list }, 'excluded by pattern');
         continue;
       }
 
-      let videoAge = now.valueOf() - (video.published || new Date()).valueOf();
-      if (videoAge < this._config.maxRetroDownload) {
-        await this.skip({ video, feed, list }, 'greater than max retro');
+      let videoPublished = (video.published || today).valueOf();
+      if (videoPublished < list.publishedSince) {
+        log(`[age] '${video.videoTitle}' was published on ${new Date(videoPublished).toISOString()} old, oldest allowed is ${new Date(list.publishedSince).toISOString()}`);
+        await this.skip({ video, feed, list }, 'expired published date');
         continue;
       }
 
-      if (video.status === DownloadStatus.Queued) {
-        log(`[queued] "${video.videoTitle}" was already queued.`);
-      } else if (video.status === DownloadStatus.Downloaded) {
-        log(`[downloaded] "${video.videoTitle}" was already downloaded.`);
-      } else if (video.status === DownloadStatus.Downloading) {
-        log(`[downloading] "${video.videoTitle}" is currently downloading.`);
-      } else {
-        // TODO: Add current queue count...
-        log(`[enqueuing] Enqueueing "${video.videoTitle}"...`);
-        this.enqueue({ video, feed, list });
-      }
+      log(`[enqueuing] Enqueueing "${video.videoTitle}", Videos Queued: ${await this._downloadQueue.count()}`);
+      this.enqueue({ video, feed, list });
     }
-    this._emitter.emit('scanned', { feed, list });
+
+    this._emitter.emit('scanned', { feed: scannedFeed, list });
   }
   
   protected async work({ feed, video, list}: DownloadRequest): Promise<void> {
@@ -128,11 +152,12 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
         info: (format) => {
           this._emitter.emit('downloading', { video, feed, list });
           log(`Downloading ${video.videoTitle} by ${video.channelName} (${video.videoUrl}) to '${format.path}'...`);
+          notify(`Download started for ${video.videoTitle}`, video.thumbnails.sd);
         },
         progress: (prog) => {
           if (prog.indeterminate) return;
           let progChange = prog.percent - prevProg;
-          if (progChange >= 0.25 || prog.percent >= 100) {
+          if (progChange >= 0.1 || prog.percent >= 100) {
             log(`[progress] '${video.videoTitle}' - ${prog.percent}%`);
             prevProg = prog.percent;
           }
@@ -149,6 +174,7 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
     
         log(`Downloaded ${video.videoTitle} by ${video.channelName} (${video.videoId})`);
         this._emitter.emit('downloaded', { video, feed, list });
+        notify(`Download completed for ${video.videoTitle}`, video.thumbnails.hd);
       }).catch(async err => {
         await this._videoRepo.markAsFailed(video);
         log(`Failed to download ${video.videoTitle} (${video.videoId}): ${err.toString()}`);
@@ -162,21 +188,10 @@ function moveFile(oldPath: string, newPath: string) {
   return new Promise<void>((resolve, reject) => {
     mkdirp(extractDirName(newPath), function (err) {
       if (err) return reject(err);
-      renameFile(oldPath, newPath, err => err ? reject(err) : resolve());
+      copyFile(oldPath, newPath, err => {
+        if (err) return reject(err);
+        deleteFile(oldPath, err => err ? reject(err) : resolve());
+      });
     });
   });
-}
-
-function prepConfig(config: PullyServiceConfig<any, any>): PullyServiceConfig {
-  config.watchlist = (config.watchlist || []).map(item => {
-    if (!item) return null;
-    if (typeof item === 'string') item = { feedUrl: item };
-    return Object.assign({}, config.defaults, item);
-  }).filter(item => !!item);
-
-  if (config.maxRetroDownload) config.maxRetroDownload = parseDuration(config.maxRetroDownload);
-
-  config.defaults = config.defaults || {};
-
-  return config;
 }

@@ -39,7 +39,7 @@ export class VideoRepository {
     record.queued = new Date();
     record.status = DownloadStatus.Queued;
     await this._db.put(record);
-    log(`Marked ${record.videoId} as queued...`);
+    log(`Marked '${record.videoTitle}' (${record.videoId}) as queued...`);
     return record;
   }
 
@@ -47,7 +47,7 @@ export class VideoRepository {
     record = await this.getOrAddVideo(record);
     record.status = DownloadStatus.Downloading;
     await this._db.put(record);
-    log(`Marked ${record.videoId} as downloading...`);
+    log(`Marked '${record.videoTitle}' (${record.videoId}) as downloading...`);
     return record;
   }
 
@@ -56,16 +56,17 @@ export class VideoRepository {
     record.downloaded = new Date();
     record.status = DownloadStatus.Downloaded;
     await this._db.put(record);
-    log(`Marked ${record.videoId} as downloaded...`);
+    log(`Marked '${record.videoTitle}' (${record.videoId}) as downloaded...`);
     return record;
   }
 
   public async markAsSkipped(record: VideoRecord, reason: string): Promise<VideoRecord> {
     record = await this.getOrAddVideo(record);
+    let wasSkipped = record.status === DownloadStatus.Skipped;
     record.status = DownloadStatus.Skipped;
     record.reason = reason;
     await this._db.put(record);
-    log(`Marked ${record.videoId} as skipped: '${reason}'...`);
+    !wasSkipped && log(`Marked '${record.videoTitle}' as skipped: '${reason}'...`);
     return record;
   }
 
@@ -73,7 +74,7 @@ export class VideoRepository {
     record = await this.getOrAddVideo(record);
     record.status = DownloadStatus.Failed;
     await this._db.put(record);
-    log(`Marked ${record.videoId} as failed...`);
+    log(`Marked '${record.videoTitle}' (${record.videoId}) as failed...`);
     return record;
   }
 

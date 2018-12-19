@@ -6,7 +6,6 @@ export interface VideoRecord extends VideoResult {
   queued?: Date;
   downloaded?: Date;
   path?: string;
-  watchlistName?: string;
 }
 
 export enum DownloadStatus {
@@ -22,30 +21,64 @@ export enum DownloadStatus {
 export interface DownloadRequest {
   video: VideoRecord;
   feed: FeedResult;
-  list: WatchListItem;
+  list: ParsedWatchListItem;
 }
 
 
 
-export interface PullyServiceConfig<TWatchlist=WatchListItem, TDuration=number> {
+export interface PullySvcConfig {
   logging?: string | boolean;
   db?: string;
-  pollMinDelay?: TDuration;
-  pollMaxDelay?: TDuration;
-  downloadDelay?: TDuration;
-  maxRetroDownload?: TDuration,
-  defaults?: DownloadDefaults;
-  watchlist: Array<TWatchlist>;
+  pollMinDelay?: string;
+  pollMaxDelay?: string;
+  downloadDelay?: string;
+  defaults?: DownloadDefaultConfig;
+  watchlist: Array<WatchListItem>;
 }
 
-export interface DownloadDefaults {
+export interface ParsedPullySvcConfig
+{
+  logging: string;
+  db: string;
+  pollMinDelay: number;
+  pollMaxDelay: number;
+  downloadDelay: number;
+  defaults: ParsedDownloadDefaults;
+  watchlist: Array<ParsedWatchListItem>;
+}
+
+export interface ParsedDownloadDefaults {
+  enabled?: boolean;
   preset?: string;
   dir?: string;
   format?: string;
   match?: string[];
+  publishedSince?: number;
 }
 
-export interface WatchListItem extends DownloadDefaults {
-  feedUrl: string;
+export interface DownloadDefaultConfig {
   enabled?: boolean;
+  preset?: string;
+  dir?: string;
+  format?: string;
+  match?: string[];
+  publishedSince?: string;
+  lookupPlaylist?: boolean;
+}
+
+export interface WatchListItem extends DownloadDefaultConfig {
+  feedUrl: string;
+  desc?: string;
+}
+
+export interface ParsedWatchListItem {
+  feedUrl: string;
+  enabled: boolean;
+  preset: string;
+  dir: string;
+  format: string;
+  match?: string[];
+  publishedSince: number;
+  desc?: string;
+  lookupPlaylist: boolean;
 }
