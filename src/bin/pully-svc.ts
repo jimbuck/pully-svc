@@ -5,15 +5,31 @@ import { resolve as resolvePath } from 'path';
 
 import * as yargs from 'yargs';
 
-import { PullyService, DEFAULT_CONFIG } from '..';
+import { DEFAULT_CONFIG } from '..';
 import { PullySvcConfig } from '../lib/models';
+import { bootstrap } from './app/main';
+import { closeLogs } from '../utils/logger';
+
+interface InitOptions { config: string }
+
+interface RunOptions extends InitOptions {
+  db: string;
+  silent?: boolean;
+}
 
 const DEFAULT_CONFIG_PATH = './pully.conf.json';
 
-yargs
+autoHandle('uncaughtException');
+autoHandle('unhandledRejection');
+
+process.on('exit', () => {
+  closeLogs();
+});
+
+(yargs as yargs.Argv<RunOptions>)
   .scriptName('pully-svc')
   .usage('Usage: $0 <config>')
-  .command('$0', 'Starts the service.', svc => svc
+  .command<RunOptions>('$0', 'Starts the service.', svc => svc
     .positional('config', {
       alias: 'c',
       type: 'string',
@@ -42,28 +58,25 @@ yargs
       default: DEFAULT_CONFIG_PATH,
     }),
     init
-  )
+)
   .argv;
 
-function run({ config: configPath }: { config: string, db: string } & yargs.Arguments) {
+function run({ config: configPath }: yargs.Arguments<RunOptions>) {
   configPath = resolvePath(configPath);
   if (!existsSync(configPath)) {
     console.error(`No config file found at '${configPath}'! Exiting...`);
-    process.exit(1);
+    exitApp(1);
   }
   
   let config: PullySvcConfig = require(configPath);
 
-  const pullySvc = new PullyService(config);
-
-  console.log(`Starting pully-svc...`);
-  pullySvc.start();
+  bootstrap(config);
 }
 
-function init({ config: configPath }: { config: string } & yargs.Arguments) {
+function init({ config: configPath }: yargs.Arguments<InitOptions>) {
   if (existsSync(configPath)) {
     console.log(`Config file already found at ${configPath}! Exiting...`);
-    process.exit(0);
+    exitApp(0);
   }
 
   // Copy and assign the watchlist so it appears at the bottom of the JSON file...
@@ -75,5 +88,20 @@ function init({ config: configPath }: { config: string } & yargs.Arguments) {
 
   writeFileSync(configPath, JSON.stringify(data, null, '\t'));
   console.log(`New config created at ${configPath}!`);
-  process.exit(0);
+  exitApp(0);
+}
+
+function autoHandle(name: string) {
+  process.on(name as any, (err: any) => {
+    process.stderr.write(`TOP LEVEL ERROR: ${name}\n`);
+    process.stderr.write(err.toString());
+
+    exitApp(99);
+  });
+}
+
+function exitApp(errorCode: number): void {
+  closeLogs();
+  if(!errorCode) process.stdout.write("\u001b[2J\u001b[0;0H");
+  process.exit(errorCode);
 }

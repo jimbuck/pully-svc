@@ -1,18 +1,4 @@
-
-interface PropertyDecorator {
-
-}
-
-interface StringDef {
-  (): PropertyDecorator;
-  (length: number): PropertyDecorator;
-  (minLength: number, maxLength: number): PropertyDecorator;
-  (pattern: RegExp): PropertyDecorator;
-}
-
-export const Str: StringDef = function Pattern(pattern?: number | RegExp, maxLength?: number) {
-  return {} as PropertyDecorator;
-};
+const parseDuration: ((str: string) => number) = require('parse-duration');
 
 export function stripTime(date: Date): Date;
 export function stripTime(ms: number): number;
@@ -25,4 +11,19 @@ export function stripTime(date: number | Date): number | Date {
   } else {
     return cleanDate.valueOf();
   }
+}
+
+export function parseDateOrDurationAgo(mysteryStr: string): number {
+  const now = Date.now();
+  try {
+    let agoTime = new Date(mysteryStr).valueOf();
+    if (isNaN(agoTime))
+      agoTime = now - parseDuration(mysteryStr);
+    if (!isNaN(agoTime))
+      return stripTime(agoTime);
+  }
+  catch {
+    // Do nothing...
+  }
+  return stripTime(now);
 }

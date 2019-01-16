@@ -27,7 +27,7 @@ export interface DownloadRequest {
 
 
 export interface PullySvcConfig {
-  logging?: string | boolean;
+  log?: string | boolean;
   db?: string;
   pollMinDelay?: string;
   pollMaxDelay?: string;
@@ -38,7 +38,7 @@ export interface PullySvcConfig {
 
 export interface ParsedPullySvcConfig
 {
-  logging: string;
+  log: string | false;
   db: string;
   pollMinDelay: number;
   pollMaxDelay: number;
@@ -53,7 +53,7 @@ export interface ParsedDownloadDefaults {
   dir?: string;
   format?: string;
   match?: string[];
-  publishedSince?: number;
+  published?: number;
 }
 
 export interface DownloadDefaultConfig {
@@ -62,7 +62,7 @@ export interface DownloadDefaultConfig {
   dir?: string;
   format?: string;
   match?: string[];
-  publishedSince?: string;
+  published?: string;
   lookupPlaylist?: boolean;
 }
 
@@ -78,7 +78,7 @@ export interface ParsedWatchListItem {
   dir: string;
   format: string;
   match?: string[];
-  publishedSince: number;
+  published: number;
   desc?: string;
   lookupPlaylist: boolean;
 }

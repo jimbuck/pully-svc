@@ -1,4 +1,4 @@
-import { test } from 'ava';
+import * as test from 'ava';
 
 test.todo('new videos are added to the database');
 test.todo('previously added videos are updated');

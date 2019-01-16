@@ -12,7 +12,7 @@ import { Scheduler, Options as SkedgyOptions } from 'skedgy';
 import { logger, notify } from '../utils/logger';
 import { VideoRepository } from './video-repo';
 import { DownloadQueue } from './download-queue';
-import { VideoRecord, DownloadRequest, DownloadStatus, WatchListItem, PullySvcConfig, ParsedPullySvcConfig, ParsedWatchListItem } from './models';
+import { VideoRecord, DownloadRequest, DownloadStatus, ParsedPullySvcConfig, ParsedWatchListItem } from './models';
 import { matchPatterns } from '../utils/matcher';
 import { stripTime } from '../utils/dates-helpers';
 
@@ -25,7 +25,7 @@ const TIMING = {
   FIFTEEN_MINUTES: 900,
 };
 export class TaskScheduler extends Scheduler<DownloadRequest> {
-  
+
   private _config: ParsedPullySvcConfig;
 
   private _pully: Pully;
@@ -51,7 +51,7 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
     if (options.config.pollMinDelay) timingOptions.pollMinDelay = options.config.pollMinDelay;
     if (options.config.pollMaxDelay) timingOptions.pollMaxDelay = options.config.pollMaxDelay;
     if (options.config.downloadDelay) timingOptions.workMinDelay = timingOptions.workMaxDelay = options.config.downloadDelay;
-    
+
     super(timingOptions);
 
     this._emitter = options.emitter;
@@ -64,13 +64,20 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
       emitter: this._emitter
     });
   }
-  
+
   public async poll(): Promise<void> {
-    for (let list of this._config.watchlist) {
-      await this._find(list).catch(err => {
-        log(`Error occurred while polling: ${JSON.stringify(err)}`);
-        this._emitter.emit('pollfailed', { list });
-      });
+    try {
+      for (let list of this._config.watchlist) {
+        try {
+          await this._find(list);
+        } catch (err) {
+          log(`Error occurred while polling: ${JSON.stringify(err)}`);
+          this._emitter.emit('pollfailed', { list, err });
+        }
+      }
+    } catch (err) {
+      log(`General error occurred while polling: ${JSON.stringify(err)}`);
+      this._emitter.emit('pollfailed', { list: null, err });
     }
   }
 
@@ -80,9 +87,13 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
     this._emitter.emit('queued', { video, feed, list });
   }
 
+  public async getQueue() {
+    return (await this._downloadQueue.query({}));
+  }
+
   public async skip({ video, feed, list }: DownloadRequest, reason: string) {
     if (video.status === DownloadStatus.Skipped) return;
-    
+
     video = await this._videoRepo.markAsSkipped(video, reason);
     this._emitter.emit('skipped', { video, feed, list });
   }
@@ -112,23 +123,21 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
       }
 
       if (list.lookupPlaylist) {
-        if (extractPlaylistId(list.feedUrl)) {
-          // Don't lookup playlist if it is a playlist...
-        } else {
+        if (!extractPlaylistId(list.feedUrl)) {
           log(`Looking up playlist for '${video.videoTitle}'...`);
           feed = await findFeed(video).catch(() => scannedFeed);
           log(`Saving '${video.videoTitle}' under playlist '${feed.playlistTitle}'...`);
         }
       }
-      
+
       if (!matchPatterns(video.videoTitle, this._config.defaults.match, list.match)) {
         await this.skip({ video, feed, list }, 'excluded by pattern');
         continue;
       }
 
       let videoPublished = (video.published || today).valueOf();
-      if (videoPublished < list.publishedSince) {
-        log(`[age] '${video.videoTitle}' was published on ${new Date(videoPublished).toISOString()} old, oldest allowed is ${new Date(list.publishedSince).toISOString()}`);
+      if (videoPublished < list.published) {
+        log(`[age] '${video.videoTitle}' was published on ${new Date(videoPublished).toISOString()} old, oldest allowed is ${new Date(list.published).toISOString()}`);
         await this.skip({ video, feed, list }, 'expired published date');
         continue;
       }
@@ -139,48 +148,53 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
 
     this._emitter.emit('scanned', { feed: scannedFeed, list });
   }
-  
-  protected async work({ feed, video, list}: DownloadRequest): Promise<void> {
-    video = await this._videoRepo.markAsDownloading(video);
-    
-    const templateFn: () => string = template(list.format).bind(null, { feed: scrubObject(feed), video: scrubObject(video) });
-    let prevProg = 0;
-    await this._pully
-      .download({
-        url: video.videoUrl,
-        preset: list.preset,
-        info: (format) => {
-          this._emitter.emit('downloading', { video, feed, list });
-          log(`Downloading ${video.videoTitle} by ${video.channelName} (${video.videoUrl}) to '${format.path}'...`);
-          notify(`Download started for ${video.videoTitle}`, video.thumbnails.sd);
-        },
-        progress: (prog) => {
-          if (prog.indeterminate) return;
-          let progChange = prog.percent - prevProg;
-          if (progChange >= 0.1 || prog.percent >= 100) {
-            log(`[progress] '${video.videoTitle}' - ${prog.percent}%`);
-            prevProg = prog.percent;
-          }
-          this._emitter.emit('progress', { feed, list, video, prog });
-        }
-      } as DownloadConfig).then(async downloadResult => {
-        const tempPath = downloadResult.path;
-        const targetPath = resolvePath(list.dir, templateFn() + extName(tempPath));
-        log(`Moving (${video.videoUrl}) from '${tempPath}' to '${targetPath}'...`);
-        await moveFile(tempPath, targetPath);
-        
-        video.path = downloadResult.path = targetPath;
-        await this._videoRepo.markAsDownloaded(video);
-    
-        log(`Downloaded ${video.videoTitle} by ${video.channelName} (${video.videoId})`);
-        this._emitter.emit('downloaded', { video, feed, list });
-        notify(`Download completed for ${video.videoTitle}`, video.thumbnails.hd);
-      }).catch(async err => {
-        await this._videoRepo.markAsFailed(video);
-        log(`Failed to download ${video.videoTitle} (${video.videoId}): ${err.toString()}`);
 
-        this._emitter.emit('downloadfailed', { video, feed, list });
-      });
+  protected async work({ feed, video, list }: DownloadRequest): Promise<void> {
+    try {
+      video = await this._videoRepo.markAsDownloading(video);
+
+      const templateFn: () => string = template(list.format).bind(null, { feed: scrubObject(feed), video: scrubObject(video) });
+      let prevProg = 0;
+      await this._pully
+        .download({
+          url: video.videoUrl,
+          preset: list.preset,
+          info: (format) => {
+            this._emitter.emit('downloading', { video, feed, list });
+            log(`Downloading ${video.videoTitle} by ${video.channelName} (${video.videoUrl}) to '${format.path}'...`);
+            notify(`Download started for ${video.videoTitle}`, video.thumbnails.sd);
+          },
+          progress: (prog) => {
+            if (prog.indeterminate) return;
+            let progChange = prog.percent - prevProg;
+            if (progChange >= 0.1 || prog.percent >= 100) {
+              log(`[progress] '${video.videoTitle}' - ${prog.percent}%`);
+              prevProg = prog.percent;
+            }
+            this._emitter.emit('progress', { feed, list, video, prog });
+          }
+        } as DownloadConfig).then(async downloadResult => {
+          const tempPath = downloadResult.path;
+          const targetPath = resolvePath(list.dir, templateFn() + extName(tempPath));
+          log(`Moving (${video.videoUrl}) from '${tempPath}' to '${targetPath}'...`);
+          await moveFile(tempPath, targetPath);
+
+          video.path = downloadResult.path = targetPath;
+          await this._videoRepo.markAsDownloaded(video);
+
+          log(`Downloaded ${video.videoTitle} by ${video.channelName} (${video.videoId})`);
+          this._emitter.emit('downloaded', { video, feed, list });
+          notify(`Download completed for ${video.videoTitle}`, video.thumbnails.hd);
+        }).catch(async err => {
+          await this._videoRepo.markAsFailed(video);
+          log(`Failed to download ${video.videoTitle} (${video.videoId}): ${err.toString()}`);
+
+          this._emitter.emit('downloadfailed', { video, feed, list, err });
+        });
+    } catch (err) {
+      log(`Failed to download ${video.videoTitle} (${video.videoId}): ${err.toString()}`);
+      this._emitter.emit('downloadfailed', { video, feed, list, err });
+    }
   }
 }
 

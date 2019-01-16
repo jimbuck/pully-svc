@@ -4,9 +4,9 @@ import { FlexelDatabase } from 'flexel';
 import { Presets, DownloadResults, ProgressData } from 'pully';
 
 import { VideoRecord, PullySvcConfig, WatchListItem, ParsedPullySvcConfig, ParsedWatchListItem } from './lib/models';
-import { logger, configureLogs, notify } from './utils/logger';
+import { logger, configureLogs, closeLogs, notify } from './utils/logger';
+import { parseDateOrDurationAgo } from './utils/dates-helpers';
 import { TaskScheduler } from './lib/task-scheduler';
-import { stripTime } from './utils/dates-helpers';
 
 
 const parseDuration: ((str: string) => number) = require('parse-duration');
@@ -16,10 +16,10 @@ export { Presets };
 const log = logger('core');
 
 const EMPTY_STRING = '';
-const DEFAULT_LOGGING = 'pully*';
+const DEFAULT_LOGGING = './pully-svc.log';
 
 export const DEFAULT_CONFIG: PullySvcConfig = {
-  logging: DEFAULT_LOGGING,
+  log: DEFAULT_LOGGING,
   db: './pully-svc-db',
   pollMinDelay: '5 minutes',
   pollMaxDelay: '10 minutes',
@@ -27,7 +27,7 @@ export const DEFAULT_CONFIG: PullySvcConfig = {
   defaults: {
     preset: Presets.HD,
     dir: './downloads',
-    publishedSince: '24 hours',
+    published: '24 hours',
     format: '${feed.feedName}/${video.title}',
     match: ['*'],
     enabled: true,
@@ -37,6 +37,7 @@ export const DEFAULT_CONFIG: PullySvcConfig = {
 };
 
 export declare interface PullyService {
+  on(event: 'log', listener: (args: { message: string }) => void): this;
   on(event: 'started', listener: () => void): this;
   on(event: 'stopped', listener: () => void): this;
   on(event: 'scanning', listener: (args: { list: WatchListItem }) => void): this;
@@ -46,8 +47,8 @@ export declare interface PullyService {
   on(event: 'downloading', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord }) => void): this;
   on(event: 'progress', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord, prog: ProgressData }) => void): this;
   on(event: 'downloaded', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord, downloadResult: DownloadResults }) => void): this;
-  on(event: 'downloadfailed', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord }) => void): this;
-  on(event: 'pollfailed', listener: (args: { list: WatchListItem }) => void): this;
+  on(event: 'downloadfailed', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord, err: Error }) => void): this;
+  on(event: 'pollfailed', listener: (args: { list?: WatchListItem, err: Error }) => void): this;
 }
 
 export class PullyService extends EventEmitter {
@@ -63,10 +64,10 @@ export class PullyService extends EventEmitter {
 
     let parsedConfig = parseConfig(config);
 
-    configureLogs(config.logging);
+    configureLogs(parsedConfig.log, this);
 
-    let rootDb = typeof config.db === 'string'
-      ? new FlexelDatabase(config.db)
+    let rootDb = typeof parsedConfig.db === 'string'
+      ? new FlexelDatabase(parsedConfig.db)
       : new FlexelDatabase();
     
     this._scheduler = new TaskScheduler({
@@ -92,12 +93,17 @@ export class PullyService extends EventEmitter {
     this.emit('stopped');
     log('Stopped!');
     notify(`PullySvc has stopped!`);
+    closeLogs();
+  }
+
+  public getQueue() {
+    return this._scheduler.getQueue();
   }
 
   public stats(): any {
     // TODO: Return status information
-    //  - current videos in database
-    //  - current videos in queue
+    //  - # of videos in database
+    //  - # of videos in queue
     //  - current download name, progress, ETA
   }
 }
@@ -111,7 +117,7 @@ function parseConfig(config: PullySvcConfig): ParsedPullySvcConfig {
   }).filter(item => !!item);
 
   let settings: ParsedPullySvcConfig = {
-    logging: typeof config.logging === 'boolean' ? (config.logging?DEFAULT_LOGGING : EMPTY_STRING) : config.logging,
+    log: typeof config.log === 'boolean' && config.log === true ? DEFAULT_LOGGING : config.log,
     db: config.db,
     pollMinDelay: parseDuration(config.pollMinDelay),
     pollMaxDelay: parseDuration(config.pollMaxDelay),
@@ -119,29 +125,13 @@ function parseConfig(config: PullySvcConfig): ParsedPullySvcConfig {
     defaults: Object.assign({}, config.defaults as any),
     watchlist: []
   };
-  settings.defaults.publishedSince = parseDateOrDurationAgo(config.defaults.publishedSince);
+  settings.defaults.published = parseDateOrDurationAgo(config.defaults.published);
 
   settings.watchlist = config.watchlist.map((item: WatchListItem) => {
-    let parsedItem = Object.assign({}, settings.defaults, item as any);
-    parsedItem.publishedSince = parseDateOrDurationAgo(item.publishedSince);
+    let parsedItem: ParsedWatchListItem = Object.assign({}, settings.defaults, item as any);
+    parsedItem.published = parseDateOrDurationAgo(item.published);
     return parsedItem;
   });
 
   return settings;
-}
-
-function parseDateOrDurationAgo(mysteryStr: string): number {
-  const now = Date.now();
-
-  try {
-    let agoTime = new Date(mysteryStr).valueOf();
-
-    if (isNaN(agoTime)) agoTime = now - parseDuration(mysteryStr);
-
-    if (!isNaN(agoTime)) return stripTime(agoTime);
-  } catch {
-    // Do nothing...
-  }
-
-  return stripTime(now);
 }
