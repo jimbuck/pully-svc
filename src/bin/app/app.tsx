@@ -9,8 +9,6 @@ import { DashboardPage, CurrentDownload } from './tabs/dashboard';
 import { QueuePage } from './tabs/queue';
 import { DatabasePage } from './tabs/database';
 import { LogsPage } from './tabs/logs';
-import { SettingsPage } from './tabs/settings';
-import { FeedResult } from 'scany';
 
 const TabNames = {
   Dashboard: 'dashboard',
@@ -61,7 +59,6 @@ export class PullySvcApp extends Component<PullySvcAppProps, PullySvcAppState, P
           <Tab name={TabNames.Queue}>Queue</Tab>
           <Tab name={TabNames.Database}>Database</Tab>
           <Tab name={TabNames.Logs}>Logs</Tab>
-          <Tab name={TabNames.Settings}>Settings</Tab>
         </Tabs><br />
         <br/>
         <div>
@@ -69,7 +66,6 @@ export class PullySvcApp extends Component<PullySvcAppProps, PullySvcAppState, P
           {this.state.activeTabName === TabNames.Queue && <QueuePage queue={this.state.queue} />}
           {this.state.activeTabName === TabNames.Database && <DatabasePage />}
           {this.state.activeTabName === TabNames.Logs && <LogsPage logs={this.state.logs} />}
-          {this.state.activeTabName === TabNames.Settings && <SettingsPage />}
         </div>
       </div>
     );
@@ -92,19 +88,20 @@ export class PullySvcApp extends Component<PullySvcAppProps, PullySvcAppState, P
       });
     });
 
-    this._pullySvc.on('progress', (args) => {
-      this.setState({
-        currentDownload: args
-      });
+    this._pullySvc.on('progress', async (currentDownload) => {
+      let queue = await this._pullySvc.getQueue();
+      if (currentDownload.prog.downloadedBytes === currentDownload.prog.totalBytes) {
+        currentDownload = null;
+      }
+      this.setState({ currentDownload, queue });
     });
 
     const updateQueue = async () => {
       let queue = await this._pullySvc.getQueue();
-      this.setState({
-        queue
-      });
+      this.setState({ queue });
     }
 
+    this._pullySvc.on('polled', updateQueue);
     this._pullySvc.on('queued', updateQueue);
     this._pullySvc.on('downloaded', updateQueue);
     this._pullySvc.on('downloadfailed', updateQueue);
@@ -118,9 +115,10 @@ export class PullySvcApp extends Component<PullySvcAppProps, PullySvcAppState, P
     this._pullySvc.stop();
     this._pullySvc.removeAllListeners('log');
     this._pullySvc.removeAllListeners('progress');
+    this._pullySvc.removeAllListeners('polled');
     this._pullySvc.removeAllListeners('queued');
     this._pullySvc.removeAllListeners('downloaded');
     this._pullySvc.removeAllListeners('downloadfailed');
-    this._pullySvc.removeAllListeners('skipped');   
+    this._pullySvc.removeAllListeners('skipped');
 	}
 }

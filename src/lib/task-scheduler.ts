@@ -102,7 +102,7 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
     if (!list.enabled) return;
 
     const today = stripTime(new Date());
-    this._emitter.emit('scanning', { list });
+    this._emitter.emit('polling', { list });
     let scannedFeed = await scanFeed(list.feedUrl);
     //log(`Found ${scannedFeed.videos.length} videos for '${list.feedUrl}'`);
     for (let video of (scannedFeed.videos as VideoRecord[])) {
@@ -143,10 +143,10 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
       }
 
       log(`[enqueuing] Enqueueing "${video.videoTitle}", Videos Queued: ${await this._downloadQueue.count()}`);
-      this.enqueue({ video, feed, list });
+      await this.enqueue({ video, feed, list });
     }
 
-    this._emitter.emit('scanned', { feed: scannedFeed, list });
+    this._emitter.emit('polled', { feed: scannedFeed, list });
   }
 
   protected async work({ feed, video, list }: DownloadRequest): Promise<void> {

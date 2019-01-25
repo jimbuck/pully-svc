@@ -7,6 +7,10 @@ export interface QueuePageProps {
 
 export class QueuePage extends Component<QueuePageProps> {
   render(props: QueuePageProps) {
+    if ((props.queue || []).length === 0) {
+      return <div>The queue is currently empty...</div>
+    }
+    
     return (
       <div>
     {props.queue.map((dr, i) => <div>#{i+1}) '{dr.video.videoTitle}' by {dr.video.channelName}</div>)}

@@ -40,8 +40,8 @@ export declare interface PullyService {
   on(event: 'log', listener: (args: { message: string }) => void): this;
   on(event: 'started', listener: () => void): this;
   on(event: 'stopped', listener: () => void): this;
-  on(event: 'scanning', listener: (args: { list: WatchListItem }) => void): this;
-  on(event: 'scanned', listener: (args: { list: WatchListItem, feed: FeedResult }) => void): this;
+  on(event: 'polling', listener: (args: { list: WatchListItem }) => void): this;
+  on(event: 'polled', listener: (args: { list: WatchListItem, feed: FeedResult }) => void): this;
   on(event: 'queued', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord }) => void): this;
   on(event: 'skipped', listener: (args: { video: VideoRecord }) => void): this;
   on(event: 'downloading', listener: (args: { list: WatchListItem, feed: FeedResult, video: VideoRecord }) => void): this;

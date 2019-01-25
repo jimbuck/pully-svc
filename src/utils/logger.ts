@@ -18,7 +18,7 @@ export function configureLogs(path: string | false, emitter: EventEmitter): void
     debug.enable('pully*,skedy*,scany*');
     logStream = createWriteStream(path);
     (debug as any).log = (...args: any[]) => {
-      let message = `[${new Date().toISOString()}] ${stripAnsi(`${formatString.apply(null, args)}`).trim()}`;
+      let message = `[${timestamp()}] ${stripAnsi(`${formatString.apply(null, args)}`).trim()}`;
       emitter.emit('log', { message });
       logStream.write(message + '\n');
     };
@@ -51,4 +51,9 @@ export async function notify(message: string, imageUrl?: string) {
   } catch (err) {
     // Do nothing...
   }
+}
+
+const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+function timestamp(date: Date = new Date()) {
+  return (new Date(date.valueOf() - tzOffset)).toISOString().slice(0, -1).replace('T', ' ');
 }

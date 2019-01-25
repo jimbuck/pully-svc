@@ -26,8 +26,7 @@ export class DashboardPage extends Component<DashboardPageProps> {
     let currentDownloadDisplay = props.currentDownload ?
       <div>
         Currently downloading: '{props.currentDownload.video.videoTitle}' from '{props.currentDownload.feed.playlistTitle}' by {props.currentDownload.video.channelName}<br/>
-        Progress: {props.currentDownload.prog.percent}% ({props.currentDownload.prog.downloadedBytes}/{props.currentDownload.prog.totalBytes})<br/>
-        Elapsed: {props.currentDownload.prog.elapsedStr} ETA: {props.currentDownload.prog.etaStr}<br/>
+        Progress: {props.currentDownload.prog.percent}% ({props.currentDownload.prog.downloadedBytes}/{props.currentDownload.prog.totalBytes})  Elapsed: {props.currentDownload.prog.elapsedStr} ETA: {props.currentDownload.prog.etaStr}<br/>
       </div> :
       <div>
         Currently downloading: Nothing<br />
@@ -35,7 +34,7 @@ export class DashboardPage extends Component<DashboardPageProps> {
 
     return (
       <div>
-        {currentDownloadDisplay}
+        <div>{currentDownloadDisplay}</div>
       </div>
     );
   }
