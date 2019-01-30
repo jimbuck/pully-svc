@@ -7,6 +7,7 @@ import { VideoRecord, PullySvcConfig, WatchListItem, ParsedPullySvcConfig, Parse
 import { logger, configureLogs, closeLogs, notify } from './utils/logger';
 import { parseDateOrDurationAgo } from './utils/dates-helpers';
 import { TaskScheduler } from './lib/task-scheduler';
+import jsonquery = require('jsonquery');
 
 
 const parseDuration: ((str: string) => number) = require('parse-duration');
@@ -98,6 +99,10 @@ export class PullyService extends EventEmitter {
 
   public getQueue() {
     return this._scheduler.getQueue();
+  }
+
+  public async query(query: jsonquery.Query<VideoRecord> = {}): Promise<VideoRecord[]> {
+    return await this._scheduler.query(query);
   }
 
   public stats(): any {

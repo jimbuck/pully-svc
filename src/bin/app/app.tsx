@@ -3,7 +3,7 @@ const { Tabs, Tab } = require('ink-tab');
 const Divider = require('ink-divider');
 
 import { PullyService } from '../..';
-import { PullySvcConfig, VideoRecord, WatchListItem, DownloadRequest } from '../../lib/models';
+import { PullySvcConfig, VideoRecord, WatchListItem, DownloadRequest, DownloadStatus } from '../../lib/models';
 
 import { DashboardPage, CurrentDownload } from './tabs/dashboard';
 import { QueuePage } from './tabs/queue';
@@ -28,7 +28,9 @@ interface PullySvcAppState {
   logs: string[];
   limit: number;
   currentDownload?: CurrentDownload;
+  recentDownloads: VideoRecord[],
   queue: DownloadRequest[]
+  database: VideoRecord[]
 }
 
 interface PullySvcAppContext {
@@ -42,10 +44,15 @@ export class PullySvcApp extends Component<PullySvcAppProps, PullySvcAppState, P
   constructor(props: PullySvcAppProps, context: PullySvcAppContext) {
     //@ts-ignore
     super(props, context);
+
+    this._pullySvc = new PullyService(props.config);
+
     this.state = {
       logs: [],
       limit: 10,
-      queue: []
+      recentDownloads: [],
+      queue: [],
+      database: []
     };
 	}
 
@@ -62,7 +69,7 @@ export class PullySvcApp extends Component<PullySvcAppProps, PullySvcAppState, P
         </Tabs><br />
         <br/>
         <div>
-          {this.state.activeTabName === TabNames.Dashboard && <DashboardPage currentDownload={this.state.currentDownload} />}
+          {this.state.activeTabName === TabNames.Dashboard && <DashboardPage currentDownload={this.state.currentDownload} recentDownloads={this.state.recentDownloads} />}
           {this.state.activeTabName === TabNames.Queue && <QueuePage queue={this.state.queue} />}
           {this.state.activeTabName === TabNames.Database && <DatabasePage />}
           {this.state.activeTabName === TabNames.Logs && <LogsPage logs={this.state.logs} />}
@@ -77,8 +84,21 @@ export class PullySvcApp extends Component<PullySvcAppProps, PullySvcAppState, P
     });
   }
 
-	componentDidMount() {
-    this._pullySvc = new PullyService(this.props.config);
+  componentDidMount() {
+    const updateLists = async () => {
+      const [
+        queue,
+        database
+      ] = await Promise.all([
+        this._pullySvc.getQueue(),
+        this._pullySvc.query()
+      ]);
+      this.setState({
+        queue,
+        database,
+        recentDownloads: database.filter(v => v.status === DownloadStatus.Downloaded).sort((a, b) => b.downloaded.valueOf() - a.downloaded.valueOf()).slice(0, 5)
+      });
+    };
 
     this._pullySvc.on('log', ({ message }) => {
       let logs = [...this.state.logs, message];
@@ -89,25 +109,19 @@ export class PullySvcApp extends Component<PullySvcAppProps, PullySvcAppState, P
     });
 
     this._pullySvc.on('progress', async (currentDownload) => {
-      let queue = await this._pullySvc.getQueue();
       if (currentDownload.prog.downloadedBytes === currentDownload.prog.totalBytes) {
         currentDownload = null;
       }
-      this.setState({ currentDownload, queue });
+      this.setState({ currentDownload });
     });
 
-    const updateQueue = async () => {
-      let queue = await this._pullySvc.getQueue();
-      this.setState({ queue });
-    }
+    this._pullySvc.on('downloaded', updateLists);
+    this._pullySvc.on('polled', updateLists);
+    this._pullySvc.on('queued', updateLists);
+    this._pullySvc.on('downloadfailed', updateLists);
+    this._pullySvc.on('skipped', updateLists);
 
-    this._pullySvc.on('polled', updateQueue);
-    this._pullySvc.on('queued', updateQueue);
-    this._pullySvc.on('downloaded', updateQueue);
-    this._pullySvc.on('downloadfailed', updateQueue);
-    this._pullySvc.on('skipped', updateQueue);
-    updateQueue();
-
+    updateLists();
     this._pullySvc.start();
 	}
 

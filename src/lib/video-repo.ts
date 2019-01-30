@@ -4,6 +4,7 @@ import { VideoRecord, DownloadStatus } from './models';
 import { logger } from '../utils/logger';
 import { FlexelTable } from 'flexel';
 import { EventEmitter } from 'events';
+import jsonquery = require('jsonquery');
 
 const log = logger('video-repo');
 
@@ -18,6 +19,10 @@ export class VideoRepository {
   }) {
     this._db = options.db;
     this._emitter = options.emitter;
+  }
+
+  public async query(query: jsonquery.Query<VideoRecord>): Promise<VideoRecord[]> {
+    return await this._db.query(query);
   }
 
   public async getOrAddVideo(video: VideoResult): Promise<VideoRecord> {

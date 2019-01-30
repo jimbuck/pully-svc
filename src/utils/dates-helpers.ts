@@ -27,3 +27,8 @@ export function parseDateOrDurationAgo(mysteryStr: string): number {
   }
   return stripTime(now);
 }
+
+const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+export function timestamp(date: Date = new Date()): string {
+  return (new Date(date.valueOf() - tzOffset)).toISOString().slice(0, -1).replace('T', ' ');
+}

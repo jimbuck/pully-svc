@@ -15,6 +15,7 @@ import { DownloadQueue } from './download-queue';
 import { VideoRecord, DownloadRequest, DownloadStatus, ParsedPullySvcConfig, ParsedWatchListItem } from './models';
 import { matchPatterns } from '../utils/matcher';
 import { stripTime } from '../utils/dates-helpers';
+import jsonquery = require('jsonquery');
 
 const log = logger('task-scheduler');
 
@@ -89,6 +90,10 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
 
   public async getQueue() {
     return (await this._downloadQueue.query({}));
+  }
+
+  public async query(query: jsonquery.Query<VideoRecord>): Promise<VideoRecord[]> {
+    return await this._videoRepo.query(query);
   }
 
   public async skip({ video, feed, list }: DownloadRequest, reason: string) {
@@ -180,7 +185,7 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
           await moveFile(tempPath, targetPath);
 
           video.path = downloadResult.path = targetPath;
-          await this._videoRepo.markAsDownloaded(video);
+          video = await this._videoRepo.markAsDownloaded(video);
 
           log(`Downloaded ${video.videoTitle} by ${video.channelName} (${video.videoId})`);
           this._emitter.emit('downloaded', { video, feed, list });

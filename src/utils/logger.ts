@@ -6,6 +6,8 @@ import * as debug from 'debug';
 import stripAnsi = require('strip-ansi');
 import { EventEmitter } from 'events';
 
+import { timestamp } from './dates-helpers';
+
 const makerWebhookKey = process.env.MAKER_WEBHOOK_KEY;
 const loggers: { [name: string]: debug.IDebugger } = {};
 const { name: appName } = require('../../package.json');
@@ -51,9 +53,4 @@ export async function notify(message: string, imageUrl?: string) {
   } catch (err) {
     // Do nothing...
   }
-}
-
-const tzOffset = (new Date()).getTimezoneOffset() * 60000;
-function timestamp(date: Date = new Date()) {
-  return (new Date(date.valueOf() - tzOffset)).toISOString().slice(0, -1).replace('T', ' ');
 }
