@@ -1,6 +1,6 @@
 {
   "name": "pully-svc",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Youtube channel and playlist auto-downloader!",
   "main": "index.js",
   "types": "./dist/index.d.ts",
