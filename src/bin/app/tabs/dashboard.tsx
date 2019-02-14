@@ -1,4 +1,4 @@
-import { h, Component, Color, Fragment } from 'ink';
+import { h, Component, Color, Fragment, InkNode } from 'ink';
 const Divider = require('ink-divider');
 
 import { ProgressData } from 'pully';
@@ -14,6 +14,7 @@ export interface CurrentDownload {
 }
 
 export interface DashboardPageProps {
+  children?: InkNode;
   currentDownload: CurrentDownload;
   recentDownloads: VideoRecord[];
 }
@@ -31,7 +32,7 @@ export class DashboardPage extends Component<DashboardPageProps> {
     let currentDownloadDisplay = props.currentDownload ?
       <div>
         Currently downloading: '{props.currentDownload.video.videoTitle}' from '{props.currentDownload.feed.playlistTitle}' by {props.currentDownload.video.channelName}<br/>
-        Progress: {props.currentDownload.prog.percent}% ({props.currentDownload.prog.downloadedBytes}/{props.currentDownload.prog.totalBytes})  Elapsed: {props.currentDownload.prog.elapsedStr} ETA: {props.currentDownload.prog.etaStr}<br/>
+        Progress: {props.currentDownload.prog.percent}% ({Math.floor(props.currentDownload.prog.bytesPerSecond/1000)}KB/s)  Elapsed: {props.currentDownload.prog.elapsedStr} ETA: {props.currentDownload.prog.etaStr}<br/>
       </div> :
       <div>Currently downloading: Nothing</div>;
     

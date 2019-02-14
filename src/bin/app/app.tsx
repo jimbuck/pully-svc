@@ -72,7 +72,7 @@ export class PullySvcApp extends Component<PullySvcAppProps, PullySvcAppState, P
           {this.state.activeTabName === TabNames.Dashboard && <DashboardPage currentDownload={this.state.currentDownload} recentDownloads={this.state.recentDownloads} />}
           {this.state.activeTabName === TabNames.Queue && <QueuePage queue={this.state.queue} />}
           {this.state.activeTabName === TabNames.Database && <DatabasePage />}
-          {this.state.activeTabName === TabNames.Logs && <LogsPage logs={this.state.logs} />}
+          {this.state.activeTabName === TabNames.Logs && <LogsPage logs={this.state.logs} limit={this.state.limit} />}
         </div>
       </div>
     );
@@ -102,7 +102,7 @@ export class PullySvcApp extends Component<PullySvcAppProps, PullySvcAppState, P
 
     this._pullySvc.on('log', ({ message }) => {
       let logs = [...this.state.logs, message];
-      logs = logs.slice(-1 * this.state.limit);
+      logs = logs.slice(-1 * this.state.limit * 10);
       this.setState({
         logs
       });

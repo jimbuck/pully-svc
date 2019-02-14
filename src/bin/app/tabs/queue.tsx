@@ -1,7 +1,8 @@
-import { h, Component } from 'ink';
+import { h, Component, InkNode } from 'ink';
 import { DownloadRequest } from '../../../lib/models';
 
 export interface QueuePageProps {
+  children?: InkNode;
   queue: DownloadRequest[];
 }
 

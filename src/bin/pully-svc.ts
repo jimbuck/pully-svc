@@ -8,7 +8,7 @@ import * as yargs from 'yargs';
 import { DEFAULT_CONFIG } from '..';
 import { PullySvcConfig } from '../lib/models';
 import { bootstrap } from './app/main';
-import { closeLogs } from '../utils/logger';
+import { closeLogs, notify } from '../utils/logger';
 
 interface InitOptions { config: string }
 
@@ -19,6 +19,7 @@ interface RunOptions extends InitOptions {
 
 const DEFAULT_CONFIG_PATH = './pully.conf.json';
 
+Error.stackTraceLimit = 20;
 autoHandle('uncaughtException');
 autoHandle('unhandledRejection');
 
@@ -92,10 +93,12 @@ function init({ config: configPath }: yargs.Arguments<InitOptions>) {
 }
 
 function autoHandle(name: string) {
-  process.on(name as any, (err: any) => {
+  process.on(name as any, async (err: Error) => {
     process.stderr.write(`TOP LEVEL ERROR: ${name}\n`);
-    process.stderr.write(err.toString());
+    process.stderr.write(`${err}\n`);
+    if (err.stack) process.stderr.write(err.stack + '\n');
 
+    await notify(`PullySvc has crashed! (${err})`);
     exitApp(99);
   });
 }

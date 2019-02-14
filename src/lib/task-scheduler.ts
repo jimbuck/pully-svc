@@ -108,7 +108,17 @@ export class TaskScheduler extends Scheduler<DownloadRequest> {
 
     const today = stripTime(new Date());
     this._emitter.emit('polling', { list });
-    let scannedFeed = await scanFeed(list.feedUrl);
+    let scannedFeed = await scanFeed(list.feedUrl).catch(err => {
+      log(`Failed to scan feed: '${list.desc}' (${list.feedUrl})
+  ${err}
+  ${err.stack}`);
+      return null;
+    });
+
+    if (scannedFeed == null) {
+      return; 
+    }
+    
     //log(`Found ${scannedFeed.videos.length} videos for '${list.feedUrl}'`);
     for (let video of (scannedFeed.videos as VideoRecord[])) {
       let feed = scannedFeed;
