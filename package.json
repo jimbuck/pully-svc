@@ -49,7 +49,7 @@
   "dependencies": {
     "debug": "^4.1.1",
     "flexel": "^0.7.3",
-    "got": "^9.6.0",
+    "got": "^11.8.5",
     "ink": "^0.5.1",
     "ink-divider": "^1.1.1",
     "ink-progress-bar": "^2.1.1",
